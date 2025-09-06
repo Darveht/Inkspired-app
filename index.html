@@ -13,7 +13,7 @@
     .top-bar{display:flex;justify-content:flex-end;padding:12px 16px;}
     .small-note{font-size:12px;color:#6b7280;}
     .chat-container{flex:1;overflow:auto;padding:16px;background:#f8fafc;}
-    .message-bubble{max-width:80%;padding:.75rem 1rem;border-radius:1rem;margin-bottom:.5rem;word-wrap:break-word;}
+    .message-bubble{max-width:80%;padding:.75rem 1rem;border-radius:1rem;margin-bottom:.5rem;word-wrap:break-word; position: relative;}
     .agent-bubble{background:#fff;color:#111;align-self:flex-start;border:1px solid #e5e7eb;}
     .user-bubble{background:#e9f5ff;color:#111;align-self:flex-end;margin-left:auto;border:1px solid #bae6fd;}
     .system-bubble{background:#fff7ed;color:#744210;text-align:center;align-self:center;padding:.5rem .75rem;border-radius:.75rem;border:1px solid #fcd34d;}
@@ -25,6 +25,13 @@
     .header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #eef2f7;background:#fff;}
     .app-name{font-weight:700;}
     .disclaimer{font-size:12px;color:#374151;background:#fff7ed;padding:.6rem .8rem;border-radius:.5rem;border:1px solid #fbbf24;margin-top:12px;}
+    
+    .message-time {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -73,7 +80,7 @@
     <div class="panel">
       <div style="display:flex;flex-direction:column;gap:12px;">
         <h2 style="margin:0">Acceso de Agente</h2>
-        <input id="agent-password-input" type="password" placeholder="Clave de agente (Inkspired2025)">
+        <input id="agent-password-input" type="password" placeholder="Ingresa la clave">
         <div style="display:flex;gap:8px;">
           <button id="agent-login-button" class="btn" style="background:#7c3aed;color:white;">Entrar</button>
           <button id="agent-login-cancel" class="btn" style="background:#e5e7eb;">Cancelar</button>
@@ -104,7 +111,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import {
-      getDatabase, ref, push, set, update, onChildAdded, off, query, orderByChild, limitToLast, serverTimestamp
+      getDatabase, ref, push, set, update, onChildAdded, off, query, orderByChild, limitToLast, serverTimestamp, remove
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -155,43 +162,109 @@
 
       // Small utilities
       function logInfo(...args){ console.log("[Inkspired]", ...args); }
+
       function addSystem(text){
         const div = document.createElement('div'); div.className = 'system-bubble message-bubble'; div.innerText = text;
         const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.justifyContent='center'; wrapper.style.marginBottom='8px';
         wrapper.appendChild(div); messagesArea.appendChild(wrapper); messagesArea.scrollTop = messagesArea.scrollHeight;
       }
-      function addMessage(text, sender, metaHTML){
-        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.marginBottom='8px';
-        wrapper.style.alignItems='flex-start';
-        if (sender === 'user') wrapper.style.justifyContent='flex-end'; else wrapper.style.justifyContent='flex-start';
+      
+      // NUEVA FUNCIÓN: Formatear la marca de tiempo a un formato de hora (HH:mm)
+      function formatTimestampToTime(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      }
 
+      // FUNCIÓN MEJORADA: Ahora acepta el ID del mensaje y la marca de tiempo para las nuevas funciones
+      function addMessage(text, sender, metaHTML, messageId, timestamp, isOwnMessage){
+        const wrapper = document.createElement('div');
+        wrapper.style.display='flex';
+        wrapper.style.marginBottom='8px';
+        wrapper.style.alignItems='flex-start';
+        if (sender === 'user') {
+          wrapper.style.justifyContent='flex-end';
+        } else {
+          wrapper.style.justifyContent='flex-start';
+        }
+        
         if (sender !== 'user'){
-          const avatar = document.createElement('div'); avatar.style.width='40px'; avatar.style.height='40px'; avatar.style.borderRadius='50%'; avatar.style.marginRight='8px';
+          const avatar = document.createElement('div');
+          avatar.style.width='40px';
+          avatar.style.height='40px';
+          avatar.style.borderRadius='50%';
+          avatar.style.marginRight='8px';
           avatar.style.backgroundImage = "url('https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw')";
-          avatar.style.backgroundSize = 'cover'; avatar.style.backgroundPosition='center';
+          avatar.style.backgroundSize = 'cover';
+          avatar.style.backgroundPosition='center';
           wrapper.appendChild(avatar);
         } else {
-          // for user align
-          const spacer = document.createElement('div'); spacer.style.width='48px'; wrapper.appendChild(spacer);
+          const spacer = document.createElement('div');
+          spacer.style.width='48px';
+          wrapper.appendChild(spacer);
         }
 
-        const bubble = document.createElement('div'); bubble.className = 'message-bubble ' + (sender==='user' ? 'user-bubble' : (sender==='agent' ? 'agent-bubble' : 'system-bubble'));
-        bubble.innerText = text;
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble ' + (sender === 'user' ? 'user-bubble' : (sender === 'agent' ? 'agent-bubble' : 'system-bubble'));
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.innerText = text;
+        
+        const metaDiv = document.createElement('div');
+        metaDiv.style.display = 'flex';
+        metaDiv.style.justifyContent = 'flex-end';
+        metaDiv.style.alignItems = 'center';
+        metaDiv.style.gap = '8px';
+        
+        // Agregar la hora del mensaje
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.innerText = formatTimestampToTime(timestamp);
+
+        metaDiv.appendChild(timeSpan);
+
         if (metaHTML){
-          const small = document.createElement('div'); small.style.fontSize='12px'; small.style.color='#6b7280'; small.style.marginTop='6px';
-          small.innerHTML = metaHTML; bubble.appendChild(small);
+          const small = document.createElement('div');
+          small.style.fontSize='12px';
+          small.style.color='#6b7280';
+          small.style.marginTop='6px';
+          small.innerHTML = metaHTML;
+          metaDiv.appendChild(small);
         }
+        
+        bubble.appendChild(contentDiv);
+        bubble.appendChild(metaDiv);
 
         wrapper.appendChild(bubble);
         messagesArea.appendChild(wrapper);
         messagesArea.scrollTop = messagesArea.scrollHeight;
+
+        // NUEVA FUNCIÓN: Detectar doble toque para eliminar el mensaje
+        if(isOwnMessage && messageId && usingRealtime) {
+          let lastTouchTime = 0;
+          bubble.addEventListener('touchstart', (e) => {
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - lastTouchTime;
+
+            if (timeDiff < 300 && timeDiff > 0) {
+              e.preventDefault(); // Previene el zoom
+              logInfo(`Doble toque detectado para eliminar el mensaje con ID: ${messageId}`);
+              safeRemove(pathChatMessages(selectedChatId, messageId));
+            }
+            lastTouchTime = currentTime;
+          });
+          // También se añade el evento de doble clic para dispositivos de escritorio
+          bubble.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            logInfo(`Doble clic detectado para eliminar el mensaje con ID: ${messageId}`);
+            safeRemove(pathChatMessages(selectedChatId, messageId));
+          });
+        }
       }
 
       // TRANSLATION: non-blocking helpers
       async function translateWithFallback(text, source, target){
-        // quick no-op
         if (!text || source === target) return text;
-        // Try Google (not recommended in client), then LibreTranslate
         try {
           if (GOOGLE_API_KEY && GOOGLE_API_KEY.trim()){
             const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
@@ -209,13 +282,9 @@
             body: JSON.stringify({ q:text, source, target, format:'text' })
           });
           const j = await r.json();
-          // LibreTranslate returns {translatedText}
           if (j && j.translatedText) return j.translatedText;
-          // some instances return array
           if (Array.isArray(j) && j[0] && j[0].translatedText) return j[0].translatedText;
         } catch(e){ console.warn("LibreTranslate failed:", e); }
-
-        // fallback to original
         return text;
       }
 
@@ -247,7 +316,7 @@
       // DB path helpers
       function pathChatsRoot(){ return `artifacts/${ARTIFACT_APP_ID}/public/data/chats`; }
       function pathChat(chatId){ return `${pathChatsRoot()}/${chatId}`; }
-      function pathChatMessages(chatId){ return `${pathChat(chatId)}/messages`; }
+      function pathChatMessages(chatId, messageId = ''){ return `${pathChat(chatId)}/messages/${messageId}`; }
 
       // DB wrappers
       async function safePush(path, payload){
@@ -267,6 +336,19 @@
       async function safeUpdate(path, payload){
         if (!usingRealtime) return false;
         try { await update(ref(db, path), payload); return true; } catch(e){ console.error("safeUpdate error", e); return false; }
+      }
+      
+      // NUEVA FUNCIÓN: Eliminar un nodo de la base de datos de manera segura
+      async function safeRemove(path) {
+        if (!usingRealtime) return false;
+        try {
+          await remove(ref(db, path));
+          logInfo(`Mensaje eliminado con éxito.`);
+          return true;
+        } catch(e) {
+          console.error(`Error al eliminar el mensaje: ${e}`);
+          return false;
+        }
       }
 
       // Listeners management
@@ -339,21 +421,19 @@
         while (currentStepIndex < STEPS.length){
           const step = STEPS[currentStepIndex];
           await new Promise(r => setTimeout(r, step.delay));
-          addMessage(step.text, 'agent');
+          // addMessage(step.text, 'agent'); // Se quita para que el listener se encargue de mostrarlo
           if (step.waitForUser){
             messageInput.placeholder = step.placeholder || "Escribe un mensaje...";
             messageInput.disabled = false; sendButton.disabled = false;
             messageInput.focus();
             isWaitingForUserInput = true;
             isAutoConversationRunning = false;
-            return; // Wait for user input, then resume next step via sendButton handler
+            return;
           }
           currentStepIndex++;
         }
         isAutoConversationRunning = false;
 
-        // All steps completed, now create a chat request node
-        // Ensure selectedChatId is null before creating a new one to prevent duplicates
         if (!selectedChatId) {
             const newChatId = crypto.randomUUID();
             selectedChatId = newChatId;
@@ -372,40 +452,29 @@
             }
             addSystem("Solicitud enviada. Espera a que un agente la acepte.");
         } else {
-            // This means runAutoConversation was called again after a chat was already established.
-            // This can happen if the user sends a message after the initial steps are done.
-            // No need to create a new chat, just proceed to send message.
             logInfo("Chat ya existente:", selectedChatId);
         }
 
-        messageInput.disabled = false; // Re-enable for regular chat messages
+        messageInput.disabled = false;
         sendButton.disabled = false;
 
-        // attach messages listener for this chat so user sees agent replies
         if (usingRealtime && selectedChatId){
           attachMessagesListener(selectedChatId, async (msg) => {
             if (!msg) return;
-            // Prevent showing messages sent by the user themselves in the same session
-            // The processedMessageIds check should handle this, but an explicit check can be helpful
             if (msg.sender === 'user' && processedMessageIds.has(msg.id)) {
-                // If it's a user's own message and it was just added locally, skip
-                // The `addMessage` in sendButton handler already shows it.
                 return;
             }
 
             if (msg.sender === 'agent'){
-              // agent speaks Spanish: translate to user's selectedLang
               const translated = await translateWithFallback(msg.text, 'es', selectedLang).catch(()=>msg.text);
-              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`);
-            } else if (msg.sender === 'system') addMessage(msg.text, 'system');
+              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, msg.id, msg.createdAt, userRole === 'agent');
+            } else if (msg.sender === 'system') {
+                addMessage(msg.text, 'system', null, msg.id, msg.createdAt, false);
+            }
             else if (msg.sender === 'user') {
-              // other user message or user's message from another session -> translate if needed
               const src = msg.lang || selectedLang;
               const t = await translateWithFallback(msg.text, src, selectedLang).catch(()=>msg.text);
-              // Only display if not already added by processedMessageIds check and is not a duplicate.
-              // Note: processedMessageIds should handle uniqueness, but if a message is sent from another tab/device,
-              // it would be new to this tab.
-              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`);
+              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`, msg.id, msg.createdAt, userRole === 'user');
             }
           });
         }
@@ -419,22 +488,22 @@
         messageInput.disabled = false; sendButton.disabled = false;
         userRole = 'agent';
 
-        // agent listens for incoming requests
         if (usingRealtime){
           attachChatsListener((request) => {
-            // When a new request arrives, clear any previously selected chat and its messages
-            selectedChatId = request.chatId; // Automatically select the new request
-            messagesArea.innerHTML = ''; // Clear previous chat messages
+            selectedChatId = request.chatId;
+            messagesArea.innerHTML = '';
             addSystem(`Nueva solicitud recibida de ${request.username || 'anónimo'} (problema: ${request.problem || 'No especificado'}). Escribe /accept para atender.`);
-            // Listen to messages for this specific chat request
             attachMessagesListener(request.chatId, async (m) => {
               if (!m) return;
+              const isOwnMessage = m.sender === 'agent';
               if (m.sender === 'user'){
-                // show text_es if available, otherwise translate from user's original lang to agent's (es)
                 const textForAgent = m.text_es || (m.lang ? await translateWithFallback(m.text, m.lang, 'es') : m.text);
-                addMessage(textForAgent, 'user', `<em>(Original: ${m.lang || 'desconocido'})</em>`);
-              } else if (m.sender === 'agent') addMessage(m.text, 'agent'); // Agent sees their own message
-              else if (m.sender === 'system') addMessage(m.text, 'system');
+                addMessage(textForAgent, 'user', `<em>(Original: ${m.lang || 'desconocido'})</em>`, m.id, m.createdAt, isOwnMessage);
+              } else if (m.sender === 'agent') {
+                addMessage(m.text, 'agent', null, m.id, m.createdAt, isOwnMessage);
+              } else if (m.sender === 'system') {
+                addMessage(m.text, 'system', null, m.id, m.createdAt, false);
+              }
             });
           });
         } else {
@@ -443,19 +512,17 @@
         addSystem("Bienvenido, agente. Canal de soporte no oficial. Esperando solicitudes...");
       }
 
-      // Event listeners UI (must always respond quickly)
+      // Event listeners UI
       userButton.addEventListener('click', () => {
         try {
           roleSelectionScreen.style.display = 'none';
           chatScreen.style.display = 'flex';
           userRole = 'user';
-          // set selected language from selector immediately
           selectedLang = langSelect.value || 'es';
           refreshUserLangDisplay();
-          currentStepIndex = 0; userData = {}; selectedChatId = null; // Reset for new user session
-          messagesArea.innerHTML = ''; // Clear chat history for new session
+          currentStepIndex = 0; userData = {}; selectedChatId = null;
+          messagesArea.innerHTML = '';
           messageInput.disabled = true; sendButton.disabled = true;
-          // start auto convo but don't await (non-blocking)
           runAutoConversation().catch(e => console.error("runAutoConversation error", e));
         } catch(e) {
           console.error("userButton click error", e);
@@ -483,49 +550,35 @@
         }
       });
 
-      // send message handler (async, non-blocking)
       sendButton.addEventListener('click', async () => {
         try {
           const text = messageInput.value.trim();
           if (!text) return;
-          // temporarily disable to prevent double clicks
           sendButton.disabled = true;
           messageInput.disabled = true;
 
           if (userRole === 'user'){
-            // --- INICIO DE CORRECCIÓN ---
-            // Si el usuario está en medio de la conversación guiada (esperando input para un paso)
             if (isWaitingForUserInput){
               const step = STEPS[currentStepIndex];
-              if (step && step.field) userData[step.field] = text; // Almacena el input del usuario
-              addMessage(text, 'user'); // Muestra el mensaje del usuario en el chat
-              messageInput.value = ''; // Limpia el campo de entrada
-
-              isWaitingForUserInput = false; // Ya se obtuvo el input para este paso
-              currentStepIndex++; // Avanza al siguiente paso
-
-              // Continúa la conversación automática para el siguiente paso o para crear el chat
+              if (step && step.field) userData[step.field] = text;
+              messageInput.value = '';
+              isWaitingForUserInput = false;
+              currentStepIndex++;
               runAutoConversation().catch(e=>console.error("runAutoConversation error after user input", e));
-              return; // IMPORANTE: Sale de la función, no intentes enviar el mensaje ni verificar selectedChatId todavía
+              return;
             }
-            // --- FIN DE CORRECCIÓN ---
 
-            // Este bloque solo se alcanza si ya se completaron todos los pasos automáticos
-            // y el chat debería haber sido creado por `runAutoConversation`
             if (!selectedChatId){
-              // Esto solo debería ocurrir si `runAutoConversation` falló en crear el chat después de los pasos.
               addSystem("Aún no se ha creado el chat. Intenta de nuevo en un momento.");
               sendButton.disabled = false; messageInput.disabled = false; return;
             }
 
             if (usingRealtime){
-              // translate user text to Spanish for agent (async)
               const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
               const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
               const key = await safePush(pathChatMessages(selectedChatId), payload);
               if (key){
                 processedMessageIds.add(key);
-                addMessage(text, 'user', `<em>(${selectedLang})</em>`);
               } else {
                 addSystem("Error enviando mensaje (ver consola).");
               }
@@ -552,12 +605,14 @@
               return;
             }
 
-            // Agent writes in Spanish always
             if (usingRealtime){
               const payload = { text, lang:'es', sender:'agent', createdAt: serverTimestamp() };
               const key = await safePush(pathChatMessages(selectedChatId), payload);
-              if (key){ processedMessageIds.add(key); addMessage(text, 'agent'); }
-              else addSystem("Error al enviar mensaje (ver consola).");
+              if (key){
+                processedMessageIds.add(key);
+              } else {
+                addSystem("Error al enviar mensaje (ver consola).");
+              }
             } else {
               addMessage(`(agente-prueba) ${text}`, 'agent');
             }
@@ -569,7 +624,6 @@
           console.error("send handler error", e);
           addSystem("Error enviando mensaje (ver consola).");
         } finally {
-          // always re-enable (unless `runAutoConversation` or another part of the logic explicitly disables for the next step)
           sendButton.disabled = false; messageInput.disabled = false;
         }
       });
@@ -577,11 +631,10 @@
       // Enter key shortcut
       messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendButton.click(); });
 
-      // language selector change: update selectedLang and visible label immediately (non-blocking)
+      // language selector change: update selectedLang and visible label immediately
       langSelect.addEventListener('change', () => {
         selectedLang = langSelect.value;
         refreshUserLangDisplay();
-        // We do not block UI translating entire UI strings here; you can add that behavior later if desired
       });
 
       // initial UI ready
@@ -603,3 +656,4 @@
   </script>
 </body>
 </html>
+
