@@ -335,6 +335,7 @@
       async function runAutoConversation(){
         if (isAutoConversationRunning) return;
         isAutoConversationRunning = true;
+
         while (currentStepIndex < STEPS.length){
           const step = STEPS[currentStepIndex];
           await new Promise(r => setTimeout(r, step.delay));
@@ -345,44 +346,66 @@
             messageInput.focus();
             isWaitingForUserInput = true;
             isAutoConversationRunning = false;
-            return;
+            return; // Wait for user input, then resume next step via sendButton handler
           }
           currentStepIndex++;
         }
         isAutoConversationRunning = false;
 
-        // Create a chat request node
-        const newChatId = crypto.randomUUID(); selectedChatId = newChatId;
-        const meta = { isRequest:true, username:userData.username||null, problem:userData.problem||null, createdAt: serverTimestamp() };
+        // All steps completed, now create a chat request node
+        // Ensure selectedChatId is null before creating a new one to prevent duplicates
+        if (!selectedChatId) {
+            const newChatId = crypto.randomUUID();
+            selectedChatId = newChatId;
+            const meta = { isRequest:true, username:userData.username||null, problem:userData.problem||null, lang:selectedLang, createdAt: serverTimestamp() };
 
-        if (usingRealtime) {
-          const ok = await safeSet(pathChat(newChatId), meta);
-          if (!ok) addSystem("No se pudo crear la solicitud en la red (ver consola).");
-          else {
-            const key = await safePush(pathChatMessages(newChatId), { text:`Un usuario solicita chat.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
-            if (key) processedMessageIds.add(key);
-          }
+            if (usingRealtime) {
+                const ok = await safeSet(pathChat(newChatId), meta);
+                if (!ok) {
+                    addSystem("No se pudo crear la solicitud en la red (ver consola).");
+                } else {
+                    const key = await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${userData.problem||'No especificado'}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
+                    if (key) processedMessageIds.add(key);
+                }
+            } else {
+                addSystem("Modo prueba: solicitud simulada (sin conexión real).");
+            }
+            addSystem("Solicitud enviada. Espera a que un agente la acepte.");
         } else {
-          addSystem("Modo prueba: solicitud simulada (sin conexión real).");
+            // This means runAutoConversation was called again after a chat was already established.
+            // This can happen if the user sends a message after the initial steps are done.
+            // No need to create a new chat, just proceed to send message.
+            logInfo("Chat ya existente:", selectedChatId);
         }
 
-        addSystem("Solicitud enviada. Espera a que un agente la acepte.");
-        messageInput.disabled = false; sendButton.disabled = false;
+        messageInput.disabled = false; // Re-enable for regular chat messages
+        sendButton.disabled = false;
 
         // attach messages listener for this chat so user sees agent replies
-        if (usingRealtime){
-          attachMessagesListener(newChatId, async (msg) => {
+        if (usingRealtime && selectedChatId){
+          attachMessagesListener(selectedChatId, async (msg) => {
             if (!msg) return;
+            // Prevent showing messages sent by the user themselves in the same session
+            // The processedMessageIds check should handle this, but an explicit check can be helpful
+            if (msg.sender === 'user' && processedMessageIds.has(msg.id)) {
+                // If it's a user's own message and it was just added locally, skip
+                // The `addMessage` in sendButton handler already shows it.
+                return;
+            }
+
             if (msg.sender === 'agent'){
               // agent speaks Spanish: translate to user's selectedLang
               const translated = await translateWithFallback(msg.text, 'es', selectedLang).catch(()=>msg.text);
-              addMessage(translated, 'agent', `<em>(${selectedLang})</em>`);
+              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`);
             } else if (msg.sender === 'system') addMessage(msg.text, 'system');
             else if (msg.sender === 'user') {
-              // other user message -> translate if needed
+              // other user message or user's message from another session -> translate if needed
               const src = msg.lang || selectedLang;
               const t = await translateWithFallback(msg.text, src, selectedLang).catch(()=>msg.text);
-              addMessage(t, 'user', `<em>(${selectedLang})</em>`);
+              // Only display if not already added by processedMessageIds check and is not a duplicate.
+              // Note: processedMessageIds should handle uniqueness, but if a message is sent from another tab/device,
+              // it would be new to this tab.
+              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`);
             }
           });
         }
@@ -399,23 +422,25 @@
         // agent listens for incoming requests
         if (usingRealtime){
           attachChatsListener((request) => {
-            selectedChatId = request.chatId;
-            addSystem(`Solicitud recibida: ${request.username || 'anonimo'} - ${request.problem || 'No especificado'}. Escribe /accept para atender.`);
-            // listen messages of this chat
+            // When a new request arrives, clear any previously selected chat and its messages
+            selectedChatId = request.chatId; // Automatically select the new request
+            messagesArea.innerHTML = ''; // Clear previous chat messages
+            addSystem(`Nueva solicitud recibida de ${request.username || 'anónimo'} (problema: ${request.problem || 'No especificado'}). Escribe /accept para atender.`);
+            // Listen to messages for this specific chat request
             attachMessagesListener(request.chatId, async (m) => {
               if (!m) return;
               if (m.sender === 'user'){
-                // show text_es if sent by user else translate
-                const textEs = m.text_es || (m.lang ? await translateWithFallback(m.text, m.lang, 'es') : m.text);
-                addMessage(textEs, 'user', `<em>(original: ${m.lang || 'desconocido'})</em>`);
-              } else if (m.sender === 'agent') addMessage(m.text, 'agent');
+                // show text_es if available, otherwise translate from user's original lang to agent's (es)
+                const textForAgent = m.text_es || (m.lang ? await translateWithFallback(m.text, m.lang, 'es') : m.text);
+                addMessage(textForAgent, 'user', `<em>(Original: ${m.lang || 'desconocido'})</em>`);
+              } else if (m.sender === 'agent') addMessage(m.text, 'agent'); // Agent sees their own message
               else if (m.sender === 'system') addMessage(m.text, 'system');
             });
           });
         } else {
           addSystem("Modo prueba: sin solicitudes reales (conexión inactiva).");
         }
-        addSystem("Bienvenido, agente. Canal de soporte no oficial.");
+        addSystem("Bienvenido, agente. Canal de soporte no oficial. Esperando solicitudes...");
       }
 
       // Event listeners UI (must always respond quickly)
@@ -427,7 +452,8 @@
           // set selected language from selector immediately
           selectedLang = langSelect.value || 'es';
           refreshUserLangDisplay();
-          currentStepIndex = 0; userData = {};
+          currentStepIndex = 0; userData = {}; selectedChatId = null; // Reset for new user session
+          messagesArea.innerHTML = ''; // Clear chat history for new session
           messageInput.disabled = true; sendButton.disabled = true;
           // start auto convo but don't await (non-blocking)
           runAutoConversation().catch(e => console.error("runAutoConversation error", e));
@@ -467,15 +493,27 @@
           messageInput.disabled = true;
 
           if (userRole === 'user'){
-            // if still in step capture field
-            const step = STEPS[currentStepIndex];
-            if (step && step.field) userData[step.field] = text;
+            // --- INICIO DE CORRECCIÓN ---
+            // Si el usuario está en medio de la conversación guiada (esperando input para un paso)
+            if (isWaitingForUserInput){
+              const step = STEPS[currentStepIndex];
+              if (step && step.field) userData[step.field] = text; // Almacena el input del usuario
+              addMessage(text, 'user'); // Muestra el mensaje del usuario en el chat
+              messageInput.value = ''; // Limpia el campo de entrada
 
-            // ensure chat exists (create if needed)
-            if (!selectedChatId && currentStepIndex >= STEPS.length){
-              await runAutoConversation();
+              isWaitingForUserInput = false; // Ya se obtuvo el input para este paso
+              currentStepIndex++; // Avanza al siguiente paso
+
+              // Continúa la conversación automática para el siguiente paso o para crear el chat
+              runAutoConversation().catch(e=>console.error("runAutoConversation error after user input", e));
+              return; // IMPORANTE: Sale de la función, no intentes enviar el mensaje ni verificar selectedChatId todavía
             }
+            // --- FIN DE CORRECCIÓN ---
+
+            // Este bloque solo se alcanza si ya se completaron todos los pasos automáticos
+            // y el chat debería haber sido creado por `runAutoConversation`
             if (!selectedChatId){
+              // Esto solo debería ocurrir si `runAutoConversation` falló en crear el chat después de los pasos.
               addSystem("Aún no se ha creado el chat. Intenta de nuevo en un momento.");
               sendButton.disabled = false; messageInput.disabled = false; return;
             }
@@ -494,10 +532,7 @@
             } else {
               addMessage(`(prueba) ${text}`, 'user');
             }
-
-            if (isWaitingForUserInput){
-              isWaitingForUserInput = false; currentStepIndex++; runAutoConversation().catch(e=>console.error(e));
-            }
+            messageInput.value = '';
 
           } else if (userRole === 'agent'){
             if (!selectedChatId){
@@ -534,7 +569,7 @@
           console.error("send handler error", e);
           addSystem("Error enviando mensaje (ver consola).");
         } finally {
-          // always re-enable
+          // always re-enable (unless `runAutoConversation` or another part of the logic explicitly disables for the next step)
           sendButton.disabled = false; messageInput.disabled = false;
         }
       });
