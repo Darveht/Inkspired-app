@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistencia Inkspired</title>
+    <!-- Incluye Tailwind CSS para estilos modernos y responsivos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Incluye la fuente Inter para un aspecto limpio -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Animación para el icono de carga inicial */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(100, 116, 139, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0); }
+        }
+
+        .icon-animation {
+            animation: pulse-border 2s infinite;
+        }
+
+        /* Animación de giro para los spinners de carga */
+        @keyframes spinner {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .animate-spin-fast {
+            animation: spinner 0.7s linear infinite;
+        }
+
+        /* Estilos del chat */
+        .chat-container {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .message-bubble {
+            max-width: 80%;
+            padding: 0.75rem 1rem;
+            border-radius: 1.5rem;
+            margin-bottom: 0.5rem;
+            word-wrap: break-word; /* Para manejar textos largos */
+        }
+        .agent-bubble {
+            background-color: #fff;
+            color: #333;
+            align-self: flex-start;
+            border: 1px solid #e5e5e5;
+        }
+        .user-bubble {
+            background-color: #fff;
+            color: #333;
+            align-self: flex-end;
+            margin-left: auto;
+            border: 1px solid #e5e5e5;
+        }
+        .agent-typing {
+            display: inline-flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+        .agent-typing div {
+            width: 8px;
+            height: 8px;
+            background-color: #9ca3af;
+            border-radius: 50%;
+            animation: bounce 0.6s infinite alternate;
+        }
+        .agent-typing div:nth-child(2) { animation-delay: 0.2s; }
+        .agent-typing div:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-4px); }
+        }
+        
+        .chat-header {
+            background-color: #fff;
+            color: #333;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Pantalla Inicial -->
+    <div id="initial-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+        <div class="relative w-48 h-48 sm:w-64 sm:h-64 rounded-full flex items-center justify-center bg-gray-200 shadow-xl icon-animation">
+            <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
+                 alt="Inkspired Icono" 
+                 class="w-32 h-32 sm:w-48 sm:h-48 rounded-full object-cover">
+        </div>
+        
+        <button id="continue-button" class="w-full max-w-xs mt-8 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
+            Continuar
+        </button>
+    </div>
+
+    <!-- Pantalla de Carga 1: Verificando Servidores -->
+    <div id="loading-screen-1" class="absolute inset-0 hidden flex-col items-center justify-center space-y-4">
+        <div class="w-12 h-12 border-4 border-gray-400 border-t-purple-600 rounded-full animate-spin-fast"></div>
+        <p class="text-xl sm:text-2xl font-medium">Verificando servidores...</p>
+    </div>
+
+    <!-- Pantalla de Carga 2: Conectando con el Agente -->
+    <div id="loading-screen-2" class="absolute inset-0 hidden flex-col items-center justify-center space-y-4">
+        <div class="w-12 h-12 border-4 border-gray-400 border-t-purple-600 rounded-full animate-spin-fast"></div>
+        <p class="text-xl sm:text-2xl font-medium">Cargando para conectarte con un representante...</p>
+    </div>
+
+    <!-- Interfaz de Chat (inicialmente oculta) -->
+    <div id="chat-interface" class="w-full h-full hidden flex-col">
+        <!-- Encabezado del chat -->
+        <div class="chat-header p-4 border-b border-gray-200 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <!-- Ícono de "Atrás" -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                <h1 class="text-xl font-bold">Inkspired Helped</h1>
+            </div>
+            <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
+                 alt="Inkspired Logo" 
+                 class="h-8 w-8 rounded-full">
+        </div>
+        
+        <!-- Contenedor de mensajes -->
+        <div class="chat-container relative">
+            <!-- Los mensajes se agregarán aquí dinámicamente -->
+            <div id="chat-messages" class="flex flex-col"></div>
+            <div class="timer-container p-4 w-full flex flex-col items-center justify-center space-y-2 text-center hidden" id="timer-display">
+                <h2 class="text-xl sm:text-2xl font-bold">Tiempo de espera estimado:</h2>
+                <div id="countdown-timer" class="text-4xl sm:text-6xl font-extrabold text-purple-600">05:00</div>
+                <p class="text-sm text-gray-400 mt-2">Estamos conectándote con un agente real. Por favor, no cierres esta ventana.</p>
+            </div>
+        </div>
+        
+        <!-- Campo de entrada de mensaje -->
+        <div class="p-4 bg-white border-t border-gray-200 flex items-center space-x-2">
+            <input type="text" id="message-input" class="flex-grow bg-gray-100 text-gray-800 placeholder-gray-400 px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Iniciar un mensaje..." disabled>
+            <button id="send-button" class="bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full focus:outline-none disabled:bg-gray-400" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Variables globales y configuración de Firebase
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId;
+        let ticketId = null;
+        const initialScreen = document.getElementById('initial-screen');
+        const continueButton = document.getElementById('continue-button');
+        const loadingScreen1 = document.getElementById('loading-screen-1');
+        const loadingScreen2 = document.getElementById('loading-screen-2');
+        const chatInterface = document.getElementById('chat-interface');
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const timerDisplay = document.getElementById('timer-display');
+        const countdownTimer = document.getElementById('countdown-timer');
+        
+        let isAutoConversationRunning = false;
+        let isWaitingForUserInput = false;
+        let currentStepIndex = 0;
+        let userData = {};
+
+        // Mensajes automáticos y pasos
+        const steps = [
+            { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", isAgent: true, image: false, delay: 1500 },
+            { text: "¿Podrías proporcionarme tu correo electrónico?", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Tu correo electrónico...", field: "email" },
+            { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Tu nombre de usuario...", field: "username" },
+            { text: "Ahora, por favor, describe brevemente tu problema.", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Describe tu problema...", field: "problem" },
+            { text: "Entendido, muchas gracias. Haré todo lo posible para resolver tu situación. Te conectaremos con un agente real en breve.", isAgent: true, delay: 2000 },
+        ];
+
+        // Función para agregar un mensaje al chat
+        function addMessageToChat(text, isAgent, image = false, isTyping = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', 'items-start', 'w-full', 'mb-2');
+            
+            if (!isAgent) {
+                messageDiv.classList.add('justify-end');
+            }
+
+            if (isAgent) {
+                const imgContainer = document.createElement('div');
+                imgContainer.classList.add('w-10', 'h-10', 'rounded-full', 'mr-2', 'flex-shrink-0');
+                if (image) {
+                     imgContainer.innerHTML = `<img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" class="rounded-full w-full h-full object-cover">`;
+                }
+                messageDiv.appendChild(imgContainer);
+            }
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('message-bubble', isAgent ? 'agent-bubble' : 'user-bubble', 'shadow-md');
+
+            if (isTyping) {
+                bubbleDiv.innerHTML = `
+                    <div class="agent-typing">
+                        <div></div><div></div><div></div>
+                    </div>
+                `;
+            } else {
+                bubbleDiv.innerText = text;
+            }
+            
+            messageDiv.appendChild(bubbleDiv);
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return bubbleDiv;
+        }
+
+        // Simular escritura del agente y enviar mensaje
+        async function typeAndSendMessage(text, image = false) {
+            const typingBubble = addMessageToChat("", true, image, true);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            typingBubble.parentNode.innerHTML = '';
+            addMessageToChat(text, true, image);
+        }
+
+        // Manejar el flujo de la conversación automática
+        async function runAutoConversation() {
+            isAutoConversationRunning = true;
+            while (currentStepIndex < steps.length) {
+                const step = steps[currentStepIndex];
+                
+                await new Promise(resolve => setTimeout(resolve, step.delay));
+                
+                await typeAndSendMessage(step.text, step.image);
+                
+                if (step.waitForUser) {
+                    messageInput.placeholder = step.placeholder;
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    messageInput.focus();
+                    isWaitingForUserInput = true;
+                    // Pausa la ejecución hasta que el usuario responda
+                    return; 
+                }
+                currentStepIndex++;
+            }
+
+            // Si el bucle termina, la conversación automática ha finalizado
+            isAutoConversationRunning = false;
+            // Genera y registra el ticket aquí
+            await createSupportTicket();
+            startLiveChat();
+        }
+
+        // Función para crear el ticket de soporte
+        async function createSupportTicket() {
+             ticketId = crypto.randomUUID();
+             const ticketData = {
+                userId: userId,
+                email: userData.email,
+                username: userData.username,
+                problem: userData.problem,
+                status: 'pending',
+                createdAt: serverTimestamp(),
+                ticketId: ticketId
+             };
+             await setDoc(doc(db, `artifacts/${appId}/public/data/tickets`, ticketId), ticketData);
+             addMessageToChat(`Tu solicitud ha sido recibida. Tu número de ticket es: ${ticketId.substring(0, 8)}`, true, true);
+        }
+
+        function startLiveChat() {
+            timerDisplay.classList.remove('hidden');
+            messageInput.placeholder = "Esperando por un agente...";
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            startTimer(5 * 60); // 5 minutos
+        }
+
+        // Función para el temporizador
+        function startTimer(duration) {
+            let timer = duration, minutes, seconds;
+            const interval = setInterval(() => {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                countdownTimer.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    clearInterval(interval);
+                    countdownTimer.textContent = "00:00";
+                    addMessageToChat("¡Un agente se ha conectado a la conversación!", true, true);
+                }
+            }, 1000);
+        }
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // Configuración y manejo del flujo de la página
+        async function setupFlow() {
+             try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                
+                const chatsCollection = collection(db, `artifacts/${appId}/public/data/chats/${userId}/messages`);
+
+                // Escucha en tiempo real los mensajes del administrador
+                onSnapshot(query(chatsCollection, orderBy('timestamp')), (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added") {
+                            const data = change.doc.data();
+                            if (data.sender === 'agent') {
+                                addMessageToChat(data.text, true, true);
+                            }
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error("Error setting up chat: ", error);
+            }
+        }
+        
+        // Manejar el envío de mensajes del usuario
+        sendButton.addEventListener('click', () => {
+            const text = messageInput.value.trim();
+            if (text !== '') {
+                const currentStep = steps[currentStepIndex];
+                if (currentStep && currentStep.field) {
+                    userData[currentStep.field] = text;
+                }
+                
+                addDoc(collection(db, `artifacts/${appId}/public/data/chats/${userId}/messages`), {
+                    text: text,
+                    sender: 'user',
+                    timestamp: serverTimestamp()
+                });
+                addMessageToChat(text, false);
+                messageInput.value = '';
+
+                // Si la conversación automática está activa, continúa al siguiente paso
+                if (isAutoConversationRunning && isWaitingForUserInput) {
+                    isWaitingForUserInput = false;
+                    currentStepIndex++;
+                    runAutoConversation();
+                }
+            }
+        });
+        
+        // Manejar el envío de mensajes con la tecla Enter
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendButton.click();
+            }
+        });
+
+        // Manejar el flujo de pantallas
+        continueButton.addEventListener('click', () => {
+            initialScreen.style.display = 'none';
+            loadingScreen1.style.display = 'flex';
+            
+            setTimeout(() => {
+                loadingScreen1.style.display = 'none';
+                loadingScreen2.style.display = 'flex';
+                
+                setTimeout(() => {
+                    loadingScreen2.style.display = 'none';
+                    chatInterface.style.display = 'flex';
+                    runAutoConversation(); // Inicia la secuencia de mensajes automáticos
+                }, 2000); // 2 segundos para la segunda animación
+            }, 2000); // 2 segundos para la primera animación
+        });
+
+        // Inicia la aplicación al cargar la página
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupFlow();
+            }
+        });
+    </script>
+</body>
+</html>
+
