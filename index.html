@@ -1,517 +1,570 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistencia Inkspired</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        /* Animación para el icono inicial */
-        @keyframes pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(100, 116, 139, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0); }
-        }
-        .icon-animation {
-            animation: pulse-border 2s infinite;
-        }
-
-        /* Estilos de la burbuja de chat */
-        .chat-container {
-            flex-grow: 1;
-            padding: 1rem;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-        }
-        .message-bubble {
-            max-width: 80%;
-            padding: 0.75rem 1rem;
-            border-radius: 1.5rem;
-            margin-bottom: 0.5rem;
-            word-wrap: break-word;
-        }
-        .agent-bubble {
-            background-color: #fff;
-            color: #333;
-            align-self: flex-start;
-            border: 1px solid #e5e5e5;
-        }
-        .user-bubble {
-            background-color: #fff;
-            color: #333;
-            align-self: flex-end;
-            margin-left: auto;
-            border: 1px solid #e5e5e5;
-        }
-        .system-bubble {
-            background-color: #e5e7eb;
-            color: #6b7280;
-            text-align: center;
-            align-self: center;
-        }
-        
-        .chat-header {
-            background-color: #fff;
-            color: #333;
-        }
-
-        /* Estilos para el contenedor de mensajes automáticos del agente */
-        .agent-tools-container {
-            overflow-x: auto;
-            scrollbar-width: none; /* Oculta la barra de desplazamiento para Firefox */
-            -ms-overflow-style: none; /* Oculta la barra de desplazamiento para IE y Edge */
-        }
-
-        /* Oculta la barra de desplazamiento para navegadores basados en WebKit (Chrome, Safari) */
-        .agent-tools-container::-webkit-scrollbar {
-            display: none;
-        }
-    </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Asistencia Inkspired — Multilenguaje (estable)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111;margin:0;height:100vh;display:flex;flex-direction:column;}
+    .center-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;}
+    .panel{background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.08);max-width:920px;width:100%;}
+    .top-bar{display:flex;justify-content:flex-end;padding:12px 16px;}
+    .small-note{font-size:12px;color:#6b7280;}
+    .chat-container{flex:1;overflow:auto;padding:16px;background:#f8fafc;}
+    .message-bubble{max-width:80%;padding:.75rem 1rem;border-radius:1rem;margin-bottom:.5rem;word-wrap:break-word;}
+    .agent-bubble{background:#fff;color:#111;align-self:flex-start;border:1px solid #e5e7eb;}
+    .user-bubble{background:#e9f5ff;color:#111;align-self:flex-end;margin-left:auto;border:1px solid #bae6fd;}
+    .system-bubble{background:#fff7ed;color:#744210;text-align:center;align-self:center;padding:.5rem .75rem;border-radius:.75rem;border:1px solid #fcd34d;}
+    .controls{display:flex;gap:.5rem;align-items:center;}
+    select.lang-select{padding:.35rem .6rem;border:1px solid #e5e7eb;border-radius:.5rem;background:#fff;}
+    input[type="text"], input[type="password"]{padding:.6rem .8rem;border-radius:999px;border:1px solid #e5e7eb;background:#f3f4f6;outline:none;width:100%;}
+    button.btn{padding:.6rem .9rem;border-radius:999px;border:none;cursor:pointer;}
+    button.btn:disabled{opacity:.5;cursor:not-allowed;}
+    .header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #eef2f7;background:#fff;}
+    .app-name{font-weight:700;}
+    .disclaimer{font-size:12px;color:#374151;background:#fff7ed;padding:.6rem .8rem;border-radius:.5rem;border:1px solid #fbbf24;margin-top:12px;}
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body>
+  <div class="top-bar">
+    <div id="connection-status" class="small-note">Inicializando...</div>
+  </div>
 
-    <!-- Pantalla de Selección de Rol -->
-    <div id="role-selection-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-        <div class="relative w-48 h-48 sm:w-64 sm:h-64 rounded-full flex items-center justify-center bg-gray-200 shadow-xl icon-animation">
-            <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
-                 alt="Inkspired Icono" 
-                 class="w-32 h-32 sm:w-48 sm:h-48 rounded-full object-cover">
+  <!-- SELECCIÓN INICIAL: idioma + rol -->
+  <div id="role-selection-screen" class="center-screen">
+    <div class="panel" role="dialog" aria-modal="true">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" alt="logo" style="width:64px;height:64px;border-radius:12px;object-fit:cover;">
+            <div>
+              <div class="app-name">Inkspired Helped</div>
+              <div class="small-note">Soporte no oficial — ayuda y sugerencias para Galo</div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <label for="lang-select" class="small-note" style="margin-right:6px;">Idioma</label>
+            <select id="lang-select" class="lang-select" aria-label="Seleccionar idioma">
+              <option value="es">Español (es)</option>
+              <option value="en">English (en)</option>
+              <option value="pt">Português (pt)</option>
+              <option value="de">Deutsch (de)</option>
+            </select>
+          </div>
         </div>
-        
-        <button id="user-button" class="w-full max-w-xs mt-8 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
-            Continuar como Usuario
-        </button>
-        <button id="agent-button" class="w-full max-w-xs mt-4 px-6 py-4 bg-gray-600 hover:bg-gray-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
-            Entrar como Agente
-        </button>
+
+        <div style="display:flex;gap:12px;flex-direction:column;align-items:stretch;">
+          <button id="user-button" class="btn" style="background:#7c3aed;color:white;font-weight:700;">Continuar como Usuario</button>
+          <button id="agent-button" class="btn" style="background:#374151;color:white;font-weight:700;">Entrar como Agente</button>
+
+          <div class="small-note" id="selector-note">Si la conexión en tiempo real falla, la app entra en modo de prueba para no bloquear la UI.</div>
+
+          <div class="disclaimer">Soporte no oficial: Este chat no es una alianza ni un acuerdo con Inkspired. Soy un ayudante para facilitar procesos y sugerencias que pueden dirigirse a Galo (creador).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN AGENTE -->
+  <div id="agent-login-screen" class="center-screen" style="display:none">
+    <div class="panel">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <h2 style="margin:0">Acceso de Agente</h2>
+        <input id="agent-password-input" type="password" placeholder="Clave de agente (Inkspired2025)">
+        <div style="display:flex;gap:8px;">
+          <button id="agent-login-button" class="btn" style="background:#7c3aed;color:white;">Entrar</button>
+          <button id="agent-login-cancel" class="btn" style="background:#e5e7eb;">Cancelar</button>
+        </div>
+        <div id="password-error" class="small-note" style="color:#dc2626;display:none">Clave incorrecta.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERFAZ DE CHAT -->
+  <div id="chat-screen" style="display:none;flex-direction:column;height:100vh;">
+    <div class="header">
+      <div class="app-name">Inkspired Helped</div>
+      <div id="user-lang-display" class="small-note"></div>
     </div>
 
-    <!-- Pantalla de Contraseña de Agente -->
-    <div id="agent-login-screen" class="absolute inset-0 hidden flex-col items-center justify-center p-4 text-center">
-        <h2 class="text-2xl font-bold mb-4">Acceso de Agente</h2>
-        <input type="password" id="agent-password-input" class="w-full max-w-xs px-4 py-3 rounded-full border border-gray-300 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Ingresa la clave">
-        <p id="password-error" class="text-red-500 mt-2 hidden">Clave incorrecta. Inténtalo de nuevo.</p>
-        <button id="agent-login-button" class="w-full max-w-xs mt-4 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
-            Entrar
-        </button>
+    <div id="messages-area" class="chat-container" aria-live="polite"></div>
+
+    <div style="padding:12px;border-top:1px solid #eef2f7;background:#fff;display:flex;gap:8px;align-items:center;">
+      <input id="message-input" type="text" placeholder="Escribe un mensaje..." disabled>
+      <button id="send-button" class="btn" style="background:#7c3aed;color:white;" disabled>Enviar</button>
     </div>
+  </div>
 
-    <!-- Interfaz de Chat (para Usuario y Agente) -->
-    <div id="chat-interface" class="w-full h-full hidden flex-col">
-        <!-- Encabezado del chat -->
-        <div class="chat-header p-4 border-b border-gray-200 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <h1 class="text-xl font-bold">Inkspired Helped</h1>
-            </div>
-            <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
-                 alt="Inkspired Logo" 
-                 class="h-8 w-8 rounded-full">
-        </div>
-        
-        <!-- Contenedor de mensajes -->
-        <div class="chat-container relative">
-            <div id="chat-messages" class="flex flex-col"></div>
-        </div>
-        
-        <!-- Contenedor de herramientas y entrada de mensaje -->
-        <div class="p-4 bg-white border-t border-gray-200 flex flex-col items-center space-y-2">
-            <!-- Los botones de mensajes automáticos para el agente se mostrarán aquí -->
-            <div id="agent-tools" class="agent-tools-container w-full px-2 hidden">
-                <div class="flex flex-row space-x-2 pb-2">
-                    <button data-message="Hola, soy un agente de soporte. ¿En qué puedo ayudarte?" class="auto-message-btn flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm">Mensaje de Bienvenida</button>
-                    <button data-message="Estamos investigando su problema. Le mantendremos informado." class="auto-message-btn flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm">Estado del Ticket</button>
-                    <button data-message="¿Hay algo más en lo que pueda ayudarte hoy?" class="auto-message-btn flex-shrink-0 px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm">Consulta Adicional</button>
-                </div>
-            </div>
-            
-            <div class="w-full flex items-center space-x-2">
-                <input type="text" id="message-input" class="flex-grow bg-gray-100 text-gray-800 placeholder-gray-400 px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Escribe un mensaje..." disabled>
-                <button id="send-button" class="bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full focus:outline-none disabled:bg-gray-400" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    </div>
+  <!-- SCRIPT: robusto, no bloqueante -->
+  <script type="module">
+    // IMPORTS Firebase modular (v11)
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import {
+      getDatabase, ref, push, set, update, onChildAdded, off, query, orderByChild, limitToLast, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
-    <!-- Firebase Imports -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Variables globales y configuración de Firebase
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // Elementos de la interfaz
-        const roleSelectionScreen = document.getElementById('role-selection-screen');
-        const userButton = document.getElementById('user-button');
-        const agentButton = document.getElementById('agent-button');
-        const agentLoginScreen = document.getElementById('agent-login-screen');
-        const agentPasswordInput = document.getElementById('agent-password-input');
-        const agentLoginButton = document.getElementById('agent-login-button');
-        const passwordError = document.getElementById('password-error');
-        const chatInterface = document.getElementById('chat-interface');
-        const chatMessages = document.getElementById('chat-messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const agentTools = document.getElementById('agent-tools');
+    document.addEventListener('DOMContentLoaded', () => {
+      // UI refs
+      const roleSelectionScreen = document.getElementById('role-selection-screen');
+      const userButton = document.getElementById('user-button');
+      const agentButton = document.getElementById('agent-button');
+      const agentLoginScreen = document.getElementById('agent-login-screen');
+      const agentLoginBtn = document.getElementById('agent-login-button');
+      const agentLoginCancel = document.getElementById('agent-login-cancel');
+      const agentPasswordInput = document.getElementById('agent-password-input');
+      const passwordError = document.getElementById('password-error');
+      const langSelect = document.getElementById('lang-select');
+      const selectorNote = document.getElementById('selector-note');
 
-        let db, auth, userId, userRole;
-        let selectedChatId = null;
-        const AGENT_PASSWORD = "Inkspired2025";
-        let chatListenerUnsubscribe = null;
-        let userData = {};
-        const processedMessageIds = new Set(); // evita duplicados al renderizar mensajes por listener y por envío local
-        
-        const steps = [
-            { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", sender: 'agent', delay: 1500 },
-            { text: "¿Podrías proporcionarme tu correo electrónico?", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Tu correo electrónico...", field: "email" },
-            { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Tu nombre de usuario...", field: "username" },
-            { text: "Ahora, por favor, describe brevemente tu problema.", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Describe tu problema...", field: "problem" },
-        ];
-        let isAutoConversationRunning = false;
-        let isWaitingForUserInput = false;
-        let currentStepIndex = 0;
+      const chatScreen = document.getElementById('chat-screen');
+      const messagesArea = document.getElementById('messages-area');
+      const messageInput = document.getElementById('message-input');
+      const sendButton = document.getElementById('send-button');
+      const connectionStatus = document.getElementById('connection-status');
+      const userLangDisplay = document.getElementById('user-lang-display');
 
-        // --- Funciones del Chat ---
-        function addMessageToChat(text, sender, isTyping = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('flex', 'items-start', 'w-full', 'mb-2');
-            
-            if (sender === 'user') {
-                messageDiv.classList.add('justify-end');
-            } else if (sender === 'agent' || sender === 'system') {
-                messageDiv.classList.add('justify-start');
-            }
+      // Configuration
+      const LIBRE_TRANSLATE_URL = "https://libretranslate.de/translate"; // fallback public endpoint
+      const GOOGLE_API_KEY = ""; // si quieres, pon la API key de Google aquí (no recomendado en cliente)
+      const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCFQ_geG0HIv2EZ-bfKc97TJNtf2sdqPzc",
+        authDomain: "clack-koder.firebaseapp.com",
+        databaseURL: "https://clack-koder-default-rtdb.firebaseio.com",
+        projectId: "clack-koder",
+        storageBucket: "clack-koder.firebasestorage.app",
+        messagingSenderId: "478151254938",
+        appId: "1:478151254938:web:e2c00e3a5426bd192b9023",
+        measurementId: "G-P29ME5Z3S1"
+      };
+      const AGENT_PASSWORD = "Inkspired2025";
+      const ARTIFACT_APP_ID = FIREBASE_CONFIG.projectId || 'default-app-id';
 
-            const bubbleDiv = document.createElement('div');
-            bubbleDiv.classList.add('message-bubble', 'shadow-md');
-            
-            if (sender === 'user') {
-                bubbleDiv.classList.add('user-bubble');
-            } else if (sender === 'agent') {
-                bubbleDiv.classList.add('agent-bubble');
-            } else {
-                 bubbleDiv.classList.add('system-bubble');
-            }
+      // State
+      let usingRealtime = false;
+      let app = null, db = null, auth = null;
+      let userId = null;
+      let userRole = null; // 'user' | 'agent'
+      let selectedChatId = null;
+      const processedMessageIds = new Set();
+      let chatsListenerRef = null, messagesListenerRef = null;
+      let selectedLang = langSelect.value || 'es';
 
-            if (isTyping) {
-                bubbleDiv.innerHTML = `<div class="agent-typing"><div></div><div></div><div></div></div>`;
-            } else {
-                bubbleDiv.innerText = text;
-            }
-            
-            if (sender === 'agent' || sender === 'system') {
-                const imgContainer = document.createElement('div');
-                imgContainer.classList.add('w-10', 'h-10', 'rounded-full', 'mr-2', 'flex-shrink-0', 'flex', 'items-center', 'justify-center');
-                 imgContainer.innerHTML = `<img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" class="rounded-full w-full h-full object-cover">`;
-                 messageDiv.appendChild(imgContainer);
-            }
+      // Small utilities
+      function logInfo(...args){ console.log("[Inkspired]", ...args); }
+      function addSystem(text){
+        const div = document.createElement('div'); div.className = 'system-bubble message-bubble'; div.innerText = text;
+        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.justifyContent='center'; wrapper.style.marginBottom='8px';
+        wrapper.appendChild(div); messagesArea.appendChild(wrapper); messagesArea.scrollTop = messagesArea.scrollHeight;
+      }
+      function addMessage(text, sender, metaHTML){
+        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.marginBottom='8px';
+        wrapper.style.alignItems='flex-start';
+        if (sender === 'user') wrapper.style.justifyContent='flex-end'; else wrapper.style.justifyContent='flex-start';
 
-            messageDiv.appendChild(bubbleDiv);
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            return bubbleDiv;
+        if (sender !== 'user'){
+          const avatar = document.createElement('div'); avatar.style.width='40px'; avatar.style.height='40px'; avatar.style.borderRadius='50%'; avatar.style.marginRight='8px';
+          avatar.style.backgroundImage = "url('https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw')";
+          avatar.style.backgroundSize = 'cover'; avatar.style.backgroundPosition='center';
+          wrapper.appendChild(avatar);
+        } else {
+          // for user align
+          const spacer = document.createElement('div'); spacer.style.width='48px'; wrapper.appendChild(spacer);
         }
 
-        async function typeAndSendMessage(text, sender) {
-            const typingBubble = addMessageToChat("", sender, true);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            typingBubble.parentNode.innerHTML = '';
-            addMessageToChat(text, sender);
+        const bubble = document.createElement('div'); bubble.className = 'message-bubble ' + (sender==='user' ? 'user-bubble' : (sender==='agent' ? 'agent-bubble' : 'system-bubble'));
+        bubble.innerText = text;
+        if (metaHTML){
+          const small = document.createElement('div'); small.style.fontSize='12px'; small.style.color='#6b7280'; small.style.marginTop='6px';
+          small.innerHTML = metaHTML; bubble.appendChild(small);
         }
 
-        // --- NUEVA FUNCIÓN: crea el documento de chat antes de agregar mensajes ---
-        async function createChatRequestInFirestore(chatIdToCreate) {
-            try {
-                // crea documento del chat (donde el agente hará la escucha)
-                await setDoc(doc(db, `artifacts/${appId}/public/data/chats`, chatIdToCreate), {
-                    isRequest: true,
-                    username: userData.username || null,
-                    problem: userData.problem || null,
-                    createdAt: serverTimestamp()
-                });
-                // agrega el mensaje inicial en la subcolección messages
-                const sysRef = await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${chatIdToCreate}/messages`), {
-                    text: `Usuario solicita chat. Esperando agente para aceptar.`,
-                    sender: 'system',
-                    isRequest: true,
-                    createdAt: serverTimestamp()
-                });
-                // marcar ese id como procesado para evitar que el listener lo duplique
-                if (sysRef && sysRef.id) processedMessageIds.add(sysRef.id);
-                return true;
-            } catch (e) {
-                console.error("createChatRequestInFirestore error:", e);
-                return false;
-            }
-        }
+        wrapper.appendChild(bubble);
+        messagesArea.appendChild(wrapper);
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+      }
 
-        // --- Lógica del Usuario ---
-        async function runAutoConversation() {
-            isAutoConversationRunning = true;
-            while (currentStepIndex < steps.length) {
-                const step = steps[currentStepIndex];
-                await new Promise(resolve => setTimeout(resolve, step.delay));
-                await typeAndSendMessage(step.text, step.sender);
-                
-                if (step.waitForUser) {
-                    messageInput.placeholder = step.placeholder;
-                    messageInput.disabled = false;
-                    sendButton.disabled = false;
-                    messageInput.focus();
-                    isWaitingForUserInput = true;
-                    isAutoConversationRunning = false;
-                    return;
-                }
-                currentStepIndex++;
-            }
-            isAutoConversationRunning = false;
+      // TRANSLATION: non-blocking helpers
+      async function translateWithFallback(text, source, target){
+        // quick no-op
+        if (!text || source === target) return text;
+        // Try Google (not recommended in client), then LibreTranslate
+        try {
+          if (GOOGLE_API_KEY && GOOGLE_API_KEY.trim()){
+            const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+            const body = { q:text, source, target, format:'text' };
+            const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+            const j = await r.json();
+            if (j && j.data && j.data.translations && j.data.translations[0]) return j.data.translations[0].translatedText;
+          }
+        } catch(e){ console.warn("Google translate failed:", e); }
 
-            // En lugar de solo crear mensajes en la subcolección, ahora CREAMOS el documento del chat
-            const newChatId = crypto.randomUUID();
-            selectedChatId = newChatId;
+        try {
+          const r = await fetch(LIBRE_TRANSLATE_URL, {
+            method:'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ q:text, source, target, format:'text' })
+          });
+          const j = await r.json();
+          // LibreTranslate returns {translatedText}
+          if (j && j.translatedText) return j.translatedText;
+          // some instances return array
+          if (Array.isArray(j) && j[0] && j[0].translatedText) return j[0].translatedText;
+        } catch(e){ console.warn("LibreTranslate failed:", e); }
 
-            const created = await createChatRequestInFirestore(newChatId);
-            if (!created) {
-                addMessageToChat("No se pudo crear la solicitud. Intenta de nuevo más tarde.", 'system');
-                messageInput.disabled = true;
-                sendButton.disabled = true;
-                return;
-            }
+        // fallback to original
+        return text;
+      }
 
-            addMessageToChat("Tu solicitud de chat ha sido enviada. Espera a que un agente te atienda.", 'system');
-            messageInput.disabled = true;
-            sendButton.disabled = true;
-            
-            // Si existía un listener previo, lo removemos
-            if (chatListenerUnsubscribe) chatListenerUnsubscribe();
-            // Escuchar mensajes de este chat (para el usuario ver respuestas del agente)
-            chatListenerUnsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), orderBy('createdAt')), (snapshot) => {
-                snapshot.docChanges().forEach(change => {
-                    const data = change.doc.data();
-                    const id = change.doc.id;
-                    if (change.type === 'added') {
-                        // ignorar si ya lo procesamos localmente
-                        if (processedMessageIds.has(id)) return;
-                        // mostrar según el sender
-                        if (data.sender === 'agent') addMessageToChat(data.text, 'agent');
-                        else if (data.sender === 'system') addMessageToChat(data.text, 'system');
-                        else if (data.sender === 'user') addMessageToChat(data.text, 'user');
-                    }
-                });
-            });
-        }
-        
-        // --- Lógica del Agente ---
-        function setupAgentPanel() {
-            roleSelectionScreen.style.display = 'none';
-            agentLoginScreen.style.display = 'none';
-            chatInterface.style.display = 'flex';
-            agentTools.classList.remove('hidden');
-            messageInput.placeholder = "Esperando un chat para aceptar...";
-            messageInput.disabled = false;
-            sendButton.disabled = false;
-            userRole = 'agent';
-            
-            if (chatListenerUnsubscribe) chatListenerUnsubscribe();
-            
-            // escuchar documentos en la colección de chats (cada documento representa una solicitud/chat)
-            chatListenerUnsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats`), orderBy('createdAt', 'desc')), (snapshot) => {
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added' && change.doc.data().isRequest) {
-                        const docData = change.doc.data();
-                        selectedChatId = change.doc.id;
-                        addMessageToChat(`Un usuario (${docData.username || 'anonimo'}) solicita chat. Problema: ${docData.problem || 'No especificado'}. Escribe /accept para iniciar la conversación.`, 'system');
-                    }
-                });
-            });
-            addMessageToChat("Bienvenido, Agente. Su ID de sesión es: " + userId + ". Esperando solicitudes de chat...", 'system');
-        }
-        
-        // --- Eventos y Inicialización ---
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        
-        onAuthStateChanged(auth, async (user) => {
-            if (!user) {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (error) {
-                    console.error("Error signing in:", error);
-                }
+      // FIREBASE safe init
+      (async function initRealtime(){
+        try {
+          app = initializeApp(FIREBASE_CONFIG);
+          auth = getAuth(app);
+          db = getDatabase(app);
+          usingRealtime = true;
+          connectionStatus.innerText = "Conexión en tiempo real: OK";
+          onAuthStateChanged(auth, async (u) => {
+            if (!u) {
+              try { await signInAnonymously(auth); } catch(e){ console.warn("signin anon error", e); }
             }
             userId = auth.currentUser?.uid || crypto.randomUUID();
-        });
+            logInfo("UID", userId);
+          });
+          logInfo("Firebase inicializado (Realtime)");
+        } catch(e){
+          usingRealtime = false;
+          connectionStatus.innerText = "Modo prueba (sin conexión real)";
+          userId = crypto.randomUUID();
+          logInfo("No se pudo inicializar Realtime:", e);
+          addSystem("La conexión en tiempo real no está disponible — modo prueba activado.");
+        }
+      })();
 
-        userButton.addEventListener('click', () => {
-            roleSelectionScreen.style.display = 'none';
-            chatInterface.style.display = 'flex';
-            userRole = 'user';
-            // Reseteamos estado de conversación automática
-            currentStepIndex = 0;
-            userData = {};
-            messageInput.disabled = true;
-            sendButton.disabled = true;
-            runAutoConversation();
-        });
-        
-        agentButton.addEventListener('click', () => {
-            roleSelectionScreen.style.display = 'none';
-            agentLoginScreen.style.display = 'flex';
-        });
+      // DB path helpers
+      function pathChatsRoot(){ return `artifacts/${ARTIFACT_APP_ID}/public/data/chats`; }
+      function pathChat(chatId){ return `${pathChatsRoot()}/${chatId}`; }
+      function pathChatMessages(chatId){ return `${pathChat(chatId)}/messages`; }
 
-        agentLoginButton.addEventListener('click', () => {
-            const password = agentPasswordInput.value;
-            if (password === AGENT_PASSWORD) {
-                passwordError.style.display = 'none';
-                setupAgentPanel();
-            } else {
-                passwordError.style.display = 'block';
+      // DB wrappers
+      async function safePush(path, payload){
+        if (!usingRealtime) return null;
+        try {
+          const refRes = await push(ref(db, path), payload);
+          return refRes?.key || null;
+        } catch(e){
+          console.error("safePush error", e);
+          return null;
+        }
+      }
+      async function safeSet(path, payload){
+        if (!usingRealtime) return false;
+        try { await set(ref(db, path), payload); return true; } catch(e){ console.error("safeSet error", e); return false; }
+      }
+      async function safeUpdate(path, payload){
+        if (!usingRealtime) return false;
+        try { await update(ref(db, path), payload); return true; } catch(e){ console.error("safeUpdate error", e); return false; }
+      }
+
+      // Listeners management
+      function attachChatsListener(onRequest){
+        if (!usingRealtime) return;
+        detachChatsListener();
+        try {
+          const r = ref(db, pathChatsRoot());
+          const q = query(r, orderByChild('createdAt'), limitToLast(50));
+          chatsListenerRef = r;
+          onChildAdded(q, (snap) => {
+            const data = snap.val();
+            if (!data) return;
+            if (data.isRequest) onRequest({ chatId: snap.key, ...data });
+          });
+        } catch(e){ console.error("attachChatsListener error", e); }
+      }
+      function detachChatsListener(){
+        if (!usingRealtime || !chatsListenerRef) return;
+        try { off(chatsListenerRef); } catch(e){ console.warn("off chats fail", e); }
+        chatsListenerRef = null;
+      }
+
+      function attachMessagesListener(chatId, onMessage){
+        if (!usingRealtime) return;
+        detachMessagesListener();
+        try {
+          const r = ref(db, pathChatMessages(chatId));
+          messagesListenerRef = r;
+          onChildAdded(r, (snap) => {
+            const id = snap.key;
+            if (!id) return;
+            if (processedMessageIds.has(id)) return; // already shown locally
+            const data = snap.val();
+            if (!data) return;
+            processedMessageIds.add(id);
+            onMessage({ id, ...data });
+          });
+        } catch(e){ console.error("attachMessagesListener error", e); }
+      }
+      function detachMessagesListener(){
+        if (!usingRealtime || !messagesListenerRef) return;
+        try { off(messagesListenerRef); } catch(e){ console.warn("off messages fail", e); }
+        messagesListenerRef = null;
+      }
+
+      // UI updates for language display
+      function refreshUserLangDisplay(){
+        const map = { es:'Español', en:'English', pt:'Português', de:'Deutsch' };
+        userLangDisplay.innerText = `Idioma: ${map[selectedLang] || selectedLang}`;
+      }
+      refreshUserLangDisplay();
+
+      // FLOW: Automated assistant steps (in Spanish base; UI is translated later but steps act as prompts)
+      const STEPS_BASE = [
+        { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", sender:'agent', delay:1500 },
+        { text: "¿Podrías proporcionarme tu correo electrónico?", sender:'agent', delay:1000, waitForUser:true, placeholder:"Tu correo electrónico...", field:"email" },
+        { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", sender:'agent', delay:1000, waitForUser:true, placeholder:"Tu nombre de usuario...", field:"username" },
+        { text: "Ahora, por favor, describe brevemente tu problema.", sender:'agent', delay:1000, waitForUser:true, placeholder:"Describe tu problema...", field:"problem" }
+      ];
+      let STEPS = JSON.parse(JSON.stringify(STEPS_BASE));
+      let currentStepIndex = 0, isAutoConversationRunning=false, isWaitingForUserInput=false;
+      let userData = {};
+
+      // runAutoConversation: shows steps to user (no blocking)
+      async function runAutoConversation(){
+        if (isAutoConversationRunning) return;
+        isAutoConversationRunning = true;
+        while (currentStepIndex < STEPS.length){
+          const step = STEPS[currentStepIndex];
+          await new Promise(r => setTimeout(r, step.delay));
+          addMessage(step.text, 'agent');
+          if (step.waitForUser){
+            messageInput.placeholder = step.placeholder || "Escribe un mensaje...";
+            messageInput.disabled = false; sendButton.disabled = false;
+            messageInput.focus();
+            isWaitingForUserInput = true;
+            isAutoConversationRunning = false;
+            return;
+          }
+          currentStepIndex++;
+        }
+        isAutoConversationRunning = false;
+
+        // Create a chat request node
+        const newChatId = crypto.randomUUID(); selectedChatId = newChatId;
+        const meta = { isRequest:true, username:userData.username||null, problem:userData.problem||null, createdAt: serverTimestamp() };
+
+        if (usingRealtime) {
+          const ok = await safeSet(pathChat(newChatId), meta);
+          if (!ok) addSystem("No se pudo crear la solicitud en la red (ver consola).");
+          else {
+            const key = await safePush(pathChatMessages(newChatId), { text:`Un usuario solicita chat.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
+            if (key) processedMessageIds.add(key);
+          }
+        } else {
+          addSystem("Modo prueba: solicitud simulada (sin conexión real).");
+        }
+
+        addSystem("Solicitud enviada. Espera a que un agente la acepte.");
+        messageInput.disabled = false; sendButton.disabled = false;
+
+        // attach messages listener for this chat so user sees agent replies
+        if (usingRealtime){
+          attachMessagesListener(newChatId, async (msg) => {
+            if (!msg) return;
+            if (msg.sender === 'agent'){
+              // agent speaks Spanish: translate to user's selectedLang
+              const translated = await translateWithFallback(msg.text, 'es', selectedLang).catch(()=>msg.text);
+              addMessage(translated, 'agent', `<em>(${selectedLang})</em>`);
+            } else if (msg.sender === 'system') addMessage(msg.text, 'system');
+            else if (msg.sender === 'user') {
+              // other user message -> translate if needed
+              const src = msg.lang || selectedLang;
+              const t = await translateWithFallback(msg.text, src, selectedLang).catch(()=>msg.text);
+              addMessage(t, 'user', `<em>(${selectedLang})</em>`);
             }
-        });
+          });
+        }
+      }
 
-        // Event listener para los botones de mensajes automáticos del agente
-        document.querySelectorAll('.auto-message-btn').forEach(button => {
-            button.addEventListener('click', () => {
-                if (userRole === 'agent' && selectedChatId) {
-                    messageInput.value = button.dataset.message;
-                    sendButton.click();
-                }
+      // FLOW: Agent panel
+      function setupAgentPanel(){
+        roleSelectionScreen.style.display = 'none';
+        agentLoginScreen.style.display = 'none';
+        chatScreen.style.display = 'flex';
+        messageInput.disabled = false; sendButton.disabled = false;
+        userRole = 'agent';
+
+        // agent listens for incoming requests
+        if (usingRealtime){
+          attachChatsListener((request) => {
+            selectedChatId = request.chatId;
+            addSystem(`Solicitud recibida: ${request.username || 'anonimo'} - ${request.problem || 'No especificado'}. Escribe /accept para atender.`);
+            // listen messages of this chat
+            attachMessagesListener(request.chatId, async (m) => {
+              if (!m) return;
+              if (m.sender === 'user'){
+                // show text_es if sent by user else translate
+                const textEs = m.text_es || (m.lang ? await translateWithFallback(m.text, m.lang, 'es') : m.text);
+                addMessage(textEs, 'user', `<em>(original: ${m.lang || 'desconocido'})</em>`);
+              } else if (m.sender === 'agent') addMessage(m.text, 'agent');
+              else if (m.sender === 'system') addMessage(m.text, 'system');
             });
-        });
+          });
+        } else {
+          addSystem("Modo prueba: sin solicitudes reales (conexión inactiva).");
+        }
+        addSystem("Bienvenido, agente. Canal de soporte no oficial.");
+      }
 
-        // Manejar el envío de mensajes
-        sendButton.addEventListener('click', async () => {
-            const text = messageInput.value.trim();
-            if (text === '') return;
+      // Event listeners UI (must always respond quickly)
+      userButton.addEventListener('click', () => {
+        try {
+          roleSelectionScreen.style.display = 'none';
+          chatScreen.style.display = 'flex';
+          userRole = 'user';
+          // set selected language from selector immediately
+          selectedLang = langSelect.value || 'es';
+          refreshUserLangDisplay();
+          currentStepIndex = 0; userData = {};
+          messageInput.disabled = true; sendButton.disabled = true;
+          // start auto convo but don't await (non-blocking)
+          runAutoConversation().catch(e => console.error("runAutoConversation error", e));
+        } catch(e) {
+          console.error("userButton click error", e);
+          addSystem("Error en interfaz (revisa consola).");
+        }
+      });
 
-            // Desactivar temporalmente para evitar doble click
-            sendButton.disabled = true;
-            messageInput.disabled = true;
+      agentButton.addEventListener('click', () => {
+        roleSelectionScreen.style.display = 'none';
+        agentLoginScreen.style.display = 'flex';
+      });
 
-            try {
-                if (userRole === 'user') {
-                    const currentStep = steps[currentStepIndex];
-                    if (currentStep && currentStep.field) {
-                        userData[currentStep.field] = text;
-                    }
-                    
-                    // Si aún no hay chat (por ejemplo usuario envía antes de que se haya creado),
-                    // intentamos crear el chat ahora mismo
-                    if (!selectedChatId) {
-                        // crear chat en firestore ahora (sólo si ya se completaron los pasos automáticos o si queremos forzar)
-                        const newChatId = crypto.randomUUID();
-                        selectedChatId = newChatId;
-                        const created = await createChatRequestInFirestore(newChatId);
-                        if (!created) {
-                            addMessageToChat("No fue posible crear el chat. Intenta de nuevo más tarde.", 'system');
-                            return;
-                        }
-                        addMessageToChat("Solicitud creada y enviada.", 'system');
-                        // arrancar listener de mensajes para el usuario
-                        if (chatListenerUnsubscribe) chatListenerUnsubscribe();
-                        chatListenerUnsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), orderBy('createdAt')), (snapshot) => {
-                            snapshot.docChanges().forEach(change => {
-                                const data = change.doc.data();
-                                const id = change.doc.id;
-                                if (change.type === 'added') {
-                                    if (processedMessageIds.has(id)) return;
-                                    if (data.sender === 'agent') addMessageToChat(data.text, 'agent');
-                                    else if (data.sender === 'system') addMessageToChat(data.text, 'system');
-                                    else if (data.sender === 'user') addMessageToChat(data.text, 'user');
-                                }
-                            });
-                        });
-                    }
+      agentLoginCancel.addEventListener('click', () => {
+        agentLoginScreen.style.display = 'none';
+        roleSelectionScreen.style.display = 'flex';
+      });
 
-                    // Enviar el mensaje del usuario a Firestore (subcolección messages)
-                    try {
-                        const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
-                            text: text,
-                            sender: 'user',
-                            createdAt: serverTimestamp()
-                        });
-                        // marcamos el id como procesado localmente para que el listener no lo vuelva a renderizar
-                        if (docRef && docRef.id) processedMessageIds.add(docRef.id);
-                        addMessageToChat(text, 'user');
-                        messageInput.value = '';
-                    } catch (e) {
-                        console.error("Error adding user message:", e);
-                        addMessageToChat("Error enviando mensaje (ver consola).", 'system');
-                    }
+      agentLoginBtn.addEventListener('click', () => {
+        const p = agentPasswordInput.value || '';
+        if (p === AGENT_PASSWORD){
+          passwordError.style.display = 'none';
+          setupAgentPanel();
+        } else {
+          passwordError.style.display = 'block';
+        }
+      });
 
-                    if (isAutoConversationRunning && isWaitingForUserInput) {
-                        isWaitingForUserInput = false;
-                        currentStepIndex++;
-                        runAutoConversation();
-                    }
+      // send message handler (async, non-blocking)
+      sendButton.addEventListener('click', async () => {
+        try {
+          const text = messageInput.value.trim();
+          if (!text) return;
+          // temporarily disable to prevent double clicks
+          sendButton.disabled = true;
+          messageInput.disabled = true;
 
-                } else if (userRole === 'agent' && selectedChatId) {
-                    if (text.toLowerCase() === '/accept') {
-                        await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
-                            text: `El agente se ha unido a la conversación.`,
-                            sender: 'system',
-                            createdAt: serverTimestamp()
-                        });
-                        await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
-                             text: `Ahora estás chateando con el usuario.`,
-                             sender: 'system',
-                             createdAt: serverTimestamp()
-                        });
-                         messageInput.placeholder = "Escribe tu respuesta...";
-                         messageInput.value = '';
-                    } else {
-                        // enviar mensaje de agente
-                        try {
-                            const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
-                                text: text,
-                                sender: 'agent',
-                                createdAt: serverTimestamp()
-                            });
-                            if (docRef && docRef.id) processedMessageIds.add(docRef.id);
-                            addMessageToChat(text, 'agent');
-                            messageInput.value = '';
-                        } catch (e) {
-                            console.error("Error adding agent message:", e);
-                            addMessageToChat("Error enviando mensaje (ver consola).", 'system');
-                        }
-                    }
-                }
-            } finally {
-                // siempre reactivar la UI
-                sendButton.disabled = false;
-                messageInput.disabled = false;
+          if (userRole === 'user'){
+            // if still in step capture field
+            const step = STEPS[currentStepIndex];
+            if (step && step.field) userData[step.field] = text;
+
+            // ensure chat exists (create if needed)
+            if (!selectedChatId && currentStepIndex >= STEPS.length){
+              await runAutoConversation();
             }
-        });
-        
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendButton.click();
+            if (!selectedChatId){
+              addSystem("Aún no se ha creado el chat. Intenta de nuevo en un momento.");
+              sendButton.disabled = false; messageInput.disabled = false; return;
             }
-        });
-    </script>
+
+            if (usingRealtime){
+              // translate user text to Spanish for agent (async)
+              const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
+              const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
+              const key = await safePush(pathChatMessages(selectedChatId), payload);
+              if (key){
+                processedMessageIds.add(key);
+                addMessage(text, 'user', `<em>(${selectedLang})</em>`);
+              } else {
+                addSystem("Error enviando mensaje (ver consola).");
+              }
+            } else {
+              addMessage(`(prueba) ${text}`, 'user');
+            }
+
+            if (isWaitingForUserInput){
+              isWaitingForUserInput = false; currentStepIndex++; runAutoConversation().catch(e=>console.error(e));
+            }
+
+          } else if (userRole === 'agent'){
+            if (!selectedChatId){
+              addSystem("No hay chat seleccionado.");
+              sendButton.disabled = false; messageInput.disabled = false; return;
+            }
+            if (text.toLowerCase() === '/accept'){
+              if (usingRealtime){
+                await safeUpdate(pathChat(selectedChatId), { isRequest:false, agentId:userId, acceptedAt: serverTimestamp() });
+                const k1 = await safePush(pathChatMessages(selectedChatId), { text: "El agente se ha unido a la conversación.", sender:'system', createdAt: serverTimestamp() });
+                const k2 = await safePush(pathChatMessages(selectedChatId), { text: "Ahora estás chateando con el agente.", sender:'system', createdAt: serverTimestamp() });
+                if (k1) processedMessageIds.add(k1); if (k2) processedMessageIds.add(k2);
+              } else addSystem("(prueba) chat aceptado");
+              messageInput.placeholder = "Escribe tu respuesta...";
+              messageInput.value = '';
+              sendButton.disabled = false; messageInput.disabled = false;
+              return;
+            }
+
+            // Agent writes in Spanish always
+            if (usingRealtime){
+              const payload = { text, lang:'es', sender:'agent', createdAt: serverTimestamp() };
+              const key = await safePush(pathChatMessages(selectedChatId), payload);
+              if (key){ processedMessageIds.add(key); addMessage(text, 'agent'); }
+              else addSystem("Error al enviar mensaje (ver consola).");
+            } else {
+              addMessage(`(agente-prueba) ${text}`, 'agent');
+            }
+            messageInput.value = '';
+          } else {
+            addSystem("Selecciona un rol antes de enviar.");
+          }
+        } catch(e){
+          console.error("send handler error", e);
+          addSystem("Error enviando mensaje (ver consola).");
+        } finally {
+          // always re-enable
+          sendButton.disabled = false; messageInput.disabled = false;
+        }
+      });
+
+      // Enter key shortcut
+      messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendButton.click(); });
+
+      // language selector change: update selectedLang and visible label immediately (non-blocking)
+      langSelect.addEventListener('change', () => {
+        selectedLang = langSelect.value;
+        refreshUserLangDisplay();
+        // We do not block UI translating entire UI strings here; you can add that behavior later if desired
+      });
+
+      // initial UI ready
+      connectionStatus.innerText = "Sistema listo";
+      addSystem("Sistema listo. Modo: " + (usingRealtime ? "Conexión en tiempo real" : "Modo prueba (sin conexión)"));
+
+      // cleanup listeners on unload
+      window.addEventListener('beforeunload', () => {
+        try { detachChatsListener(); detachMessagesListener(); } catch(e){ /* noop */ }
+      });
+
+      // detach helpers
+      function detachChatsListener(){ if (usingRealtime && chatsListenerRef) try{ off(chatsListenerRef); } catch(e){} chatsListenerRef=null; }
+      function detachMessagesListener(){ if (usingRealtime && messagesListenerRef) try{ off(messagesListenerRef); } catch(e){} messagesListenerRef=null; }
+
+      // Final log
+      logInfo("Interfaz inicializada, listo para interacción.");
+    }); // DOMContentLoaded end
+  </script>
 </body>
 </html>
