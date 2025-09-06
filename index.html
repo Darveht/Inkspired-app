@@ -32,6 +32,31 @@
       margin-top: 4px;
       text-align: right;
     }
+
+    /* Typing indicator styles */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #f0f4f8;
+      border-radius: 1rem;
+      padding: 0.75rem 1rem;
+      max-width: fit-content;
+      margin-bottom: 0.5rem;
+    }
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #94a3b8;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
   </style>
 </head>
 <body>
@@ -99,6 +124,15 @@
 
     <div id="messages-area" class="chat-container" aria-live="polite"></div>
 
+    <!-- Typing indicator -->
+    <div id="typing-indicator" style="display:none;">
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>
+
     <div style="padding:12px;border-top:1px solid #eef2f7;background:#fff;display:flex;gap:8px;align-items:center;">
       <input id="message-input" type="text" placeholder="Escribe un mensaje..." disabled>
       <button id="send-button" class="btn" style="background:#7c3aed;color:white;" disabled>Enviar</button>
@@ -133,6 +167,7 @@
       const sendButton = document.getElementById('send-button');
       const connectionStatus = document.getElementById('connection-status');
       const userLangDisplay = document.getElementById('user-lang-display');
+      const typingIndicator = document.getElementById('typing-indicator');
 
       // Configuration
       const LIBRE_TRANSLATE_URL = "https://libretranslate.de/translate"; // fallback public endpoint
@@ -156,8 +191,6 @@
       let userId = null;
       let userRole = null; // 'user' | 'agent'
       let selectedChatId = null;
-      // Eliminamos el `Set` de IDs, ya que el nuevo flujo de visualización lo hace innecesario
-      // const processedMessageIds = new Set();
       let chatsListenerRef = null, messagesListenerRef = null;
       let selectedLang = langSelect.value || 'es';
 
@@ -170,14 +203,12 @@
         wrapper.appendChild(div); messagesArea.appendChild(wrapper); messagesArea.scrollTop = messagesArea.scrollHeight;
       }
       
-      // NUEVA FUNCIÓN: Formatear la marca de tiempo a un formato de hora (HH:mm)
       function formatTimestampToTime(timestamp) {
         if (!timestamp) return '';
         const date = new Date(timestamp);
         return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
       }
 
-      // FUNCIÓN MEJORADA: Ahora acepta el ID del mensaje y la marca de tiempo para las nuevas funciones
       function addMessage(text, sender, metaHTML, messageId, timestamp, isOwnMessage){
         const wrapper = document.createElement('div');
         wrapper.style.display='flex';
@@ -217,7 +248,6 @@
         metaDiv.style.alignItems = 'center';
         metaDiv.style.gap = '8px';
         
-        // Agregar la hora del mensaje
         const timeSpan = document.createElement('span');
         timeSpan.className = 'message-time';
         timeSpan.innerText = formatTimestampToTime(timestamp);
@@ -240,7 +270,6 @@
         messagesArea.appendChild(wrapper);
         messagesArea.scrollTop = messagesArea.scrollHeight;
 
-        // NUEVA FUNCIÓN: Detectar doble toque para eliminar el mensaje
         if(isOwnMessage && messageId && usingRealtime) {
           let lastTouchTime = 0;
           bubble.addEventListener('touchstart', (e) => {
@@ -248,19 +277,27 @@
             const timeDiff = currentTime - lastTouchTime;
 
             if (timeDiff < 300 && timeDiff > 0) {
-              e.preventDefault(); // Previene el zoom
+              e.preventDefault();
               logInfo(`Doble toque detectado para eliminar el mensaje con ID: ${messageId}`);
               safeRemove(pathChatMessages(selectedChatId, messageId));
             }
             lastTouchTime = currentTime;
           });
-          // También se añade el evento de doble clic para dispositivos de escritorio
           bubble.addEventListener('dblclick', (e) => {
             e.preventDefault();
             logInfo(`Doble clic detectado para eliminar el mensaje con ID: ${messageId}`);
             safeRemove(pathChatMessages(selectedChatId, messageId));
           });
         }
+      }
+
+      function showTypingIndicator() {
+        typingIndicator.style.display = 'block';
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+      }
+
+      function hideTypingIndicator() {
+        typingIndicator.style.display = 'none';
       }
 
       // TRANSLATION: non-blocking helpers
@@ -339,7 +376,6 @@
         try { await update(ref(db, path), payload); return true; } catch(e){ console.error("safeUpdate error", e); return false; }
       }
       
-      // NUEVA FUNCIÓN: Eliminar un nodo de la base de datos de manera segura
       async function safeRemove(path) {
         if (!usingRealtime) return false;
         try {
@@ -401,7 +437,7 @@
       }
       refreshUserLangDisplay();
 
-      // FLOW: Automated assistant steps (in Spanish base; UI is translated later but steps act as prompts)
+      // FLOW: Automated assistant steps
       const STEPS_BASE = [
         { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", sender:'agent', delay:1500 },
         { text: "¿Podrías proporcionarme tu correo electrónico?", sender:'agent', delay:1000, waitForUser:true, placeholder:"Tu correo electrónico...", field:"email" },
@@ -412,27 +448,23 @@
       let currentStepIndex = 0, isAutoConversationRunning=false, isWaitingForUserInput=false;
       let userData = {};
 
-      // runAutoConversation: shows steps to user (no blocking)
       async function runAutoConversation(){
         if (isAutoConversationRunning) return;
         isAutoConversationRunning = true;
         
-        // CORREGIDO: Ahora los mensajes automáticos también se envían a la base de datos
-        // para que el listener los muestre.
         while (currentStepIndex < STEPS.length){
           const step = STEPS[currentStepIndex];
           await new Promise(r => setTimeout(r, step.delay));
-          
+
+          showTypingIndicator();
+          await new Promise(r => setTimeout(r, 1000));
+          hideTypingIndicator();
+
+          addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
+
           if(usingRealtime) {
             const payload = { text: step.text, lang: 'es', sender: 'agent', createdAt: serverTimestamp() };
-            const key = await safePush(pathChatMessages(selectedChatId), payload);
-            if (key) {
-              // La visualización se hará a través del listener
-            } else {
-              addSystem("Error al enviar mensaje automático (ver consola).");
-            }
-          } else {
-            addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
+            await safePush(pathChatMessages(selectedChatId), payload);
           }
 
           if (step.waitForUser){
@@ -457,7 +489,7 @@
                 if (!ok) {
                     addSystem("No se pudo crear la solicitud en la red (ver consola).");
                 } else {
-                    const key = await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${userData.problem||'No especificado'}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
+                    await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${userData.problem||'No especificado'}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
                 }
             } else {
                 addSystem("Modo prueba: solicitud simulada (sin conexión real).");
@@ -469,24 +501,18 @@
 
         messageInput.disabled = false;
         sendButton.disabled = false;
-
+        
         if (usingRealtime && selectedChatId){
           attachMessagesListener(selectedChatId, async (msg) => {
             if (!msg) return;
             
-            // Solo muestra los mensajes que no sean del usuario local para evitar duplicados
-            const isOwnMessage = (userRole === 'user' && msg.sender === 'user') || (userRole === 'agent' && msg.sender === 'agent');
-            if (isOwnMessage) {
-                return;
-            }
-
-            if (msg.sender === 'agent'){
+            if (msg.sender === 'agent' && userRole === 'user'){
               const translated = await translateWithFallback(msg.text, 'es', selectedLang).catch(()=>msg.text);
               addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, msg.id, msg.createdAt, userRole === 'agent');
             } else if (msg.sender === 'system') {
                 addMessage(msg.text, 'system', null, msg.id, msg.createdAt, false);
             }
-            else if (msg.sender === 'user') {
+            else if (msg.sender === 'user' && userRole === 'agent') {
               const src = msg.lang || selectedLang;
               const t = await translateWithFallback(msg.text, src, selectedLang).catch(()=>msg.text);
               addMessage(t, 'user', `<em>(en ${selectedLang})</em>`, msg.id, msg.createdAt, userRole === 'user');
@@ -495,7 +521,6 @@
         }
       }
 
-      // FLOW: Agent panel
       function setupAgentPanel(){
         roleSelectionScreen.style.display = 'none';
         agentLoginScreen.style.display = 'none';
@@ -538,12 +563,11 @@
           currentStepIndex = 0; userData = {}; selectedChatId = null;
           messagesArea.innerHTML = '';
           messageInput.disabled = true; sendButton.disabled = true;
-          // Creación de chat para mensajes iniciales
           if (usingRealtime) {
             const newChatId = crypto.randomUUID();
             selectedChatId = newChatId;
           }
-          await runAutoConversation().catch(e => console.error("runAutoConversation error", e));
+          await runAutoConversation();
         } catch(e) {
           console.error("userButton click error", e);
           addSystem("Error en interfaz (revisa consola).");
@@ -576,16 +600,14 @@
           if (!text) return;
           sendButton.disabled = true;
           messageInput.disabled = true;
+          
+          addMessage(text, userRole, null, null, new Date().getTime(), true);
+          messageInput.value = '';
 
           if (userRole === 'user'){
             if (isWaitingForUserInput){
               const step = STEPS[currentStepIndex];
               if (step && step.field) userData[step.field] = text;
-              
-              // Muestra el mensaje del usuario de forma inmediata
-              addMessage(text, 'user', null, null, new Date().getTime(), true);
-
-              messageInput.value = '';
               isWaitingForUserInput = false;
               currentStepIndex++;
               runAutoConversation().catch(e=>console.error("runAutoConversation error after user input", e));
@@ -598,17 +620,10 @@
             }
 
             if (usingRealtime){
-              // Muestra el mensaje del usuario de forma inmediata
-              addMessage(text, 'user', null, null, new Date().getTime(), true);
-              
               const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
               const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
               await safePush(pathChatMessages(selectedChatId), payload);
-            } else {
-              addMessage(`(prueba) ${text}`, 'user', null, null, new Date().getTime(), true);
             }
-            messageInput.value = '';
-
           } else if (userRole === 'agent'){
             if (!selectedChatId){
               addSystem("No hay chat seleccionado.");
@@ -627,15 +642,9 @@
             }
 
             if (usingRealtime){
-              // Muestra el mensaje del agente de forma inmediata
-              addMessage(text, 'agent', null, null, new Date().getTime(), true);
-
               const payload = { text, lang:'es', sender:'agent', createdAt: serverTimestamp() };
               await safePush(pathChatMessages(selectedChatId), payload);
-            } else {
-              addMessage(`(agente-prueba) ${text}`, 'agent', null, null, new Date().getTime(), true);
             }
-            messageInput.value = '';
           } else {
             addSystem("Selecciona un rol antes de enviar.");
           }
