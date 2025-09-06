@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Asistencia Inkspired</title>
-    <!-- Incluye Tailwind CSS para estilos modernos y responsivos -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Incluye la fuente Inter para un aspecto limpio -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -19,28 +17,17 @@
             height: 100vh;
         }
 
-        /* Animación para el icono de carga inicial */
+        /* Animación para el icono inicial */
         @keyframes pulse-border {
             0% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0.4); }
             70% { box-shadow: 0 0 0 10px rgba(100, 116, 139, 0); }
             100% { box-shadow: 0 0 0 0 rgba(100, 116, 139, 0); }
         }
-
         .icon-animation {
             animation: pulse-border 2s infinite;
         }
 
-        /* Animación de giro para los spinners de carga */
-        @keyframes spinner {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .animate-spin-fast {
-            animation: spinner 0.7s linear infinite;
-        }
-
-        /* Estilos del chat */
+        /* Estilos de la burbuja de chat */
         .chat-container {
             flex-grow: 1;
             padding: 1rem;
@@ -53,7 +40,7 @@
             padding: 0.75rem 1rem;
             border-radius: 1.5rem;
             margin-bottom: 0.5rem;
-            word-wrap: break-word; /* Para manejar textos largos */
+            word-wrap: break-word;
         }
         .agent-bubble {
             background-color: #fff;
@@ -68,23 +55,11 @@
             margin-left: auto;
             border: 1px solid #e5e5e5;
         }
-        .agent-typing {
-            display: inline-flex;
-            gap: 0.25rem;
-            align-items: center;
-        }
-        .agent-typing div {
-            width: 8px;
-            height: 8px;
-            background-color: #9ca3af;
-            border-radius: 50%;
-            animation: bounce 0.6s infinite alternate;
-        }
-        .agent-typing div:nth-child(2) { animation-delay: 0.2s; }
-        .agent-typing div:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce {
-            from { transform: translateY(0); }
-            to { transform: translateY(-4px); }
+        .system-bubble {
+            background-color: #e5e7eb;
+            color: #6b7280;
+            text-align: center;
+            align-self: center;
         }
         
         .chat-header {
@@ -95,40 +70,37 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Pantalla Inicial -->
-    <div id="initial-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+    <!-- Pantalla de Selección de Rol -->
+    <div id="role-selection-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
         <div class="relative w-48 h-48 sm:w-64 sm:h-64 rounded-full flex items-center justify-center bg-gray-200 shadow-xl icon-animation">
             <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
                  alt="Inkspired Icono" 
                  class="w-32 h-32 sm:w-48 sm:h-48 rounded-full object-cover">
         </div>
         
-        <button id="continue-button" class="w-full max-w-xs mt-8 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
-            Continuar
+        <button id="user-button" class="w-full max-w-xs mt-8 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
+            Continuar como Usuario
+        </button>
+        <button id="agent-button" class="w-full max-w-xs mt-4 px-6 py-4 bg-gray-600 hover:bg-gray-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
+            Entrar como Agente
         </button>
     </div>
 
-    <!-- Pantalla de Carga 1: Verificando Servidores -->
-    <div id="loading-screen-1" class="absolute inset-0 hidden flex-col items-center justify-center space-y-4">
-        <div class="w-12 h-12 border-4 border-gray-400 border-t-purple-600 rounded-full animate-spin-fast"></div>
-        <p class="text-xl sm:text-2xl font-medium">Verificando servidores...</p>
+    <!-- Pantalla de Contraseña de Agente -->
+    <div id="agent-login-screen" class="absolute inset-0 hidden flex-col items-center justify-center p-4 text-center">
+        <h2 class="text-2xl font-bold mb-4">Acceso de Agente</h2>
+        <input type="password" id="agent-password-input" class="w-full max-w-xs px-4 py-3 rounded-full border border-gray-300 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Ingresa la clave">
+        <p id="password-error" class="text-red-500 mt-2 hidden">Clave incorrecta. Inténtalo de nuevo.</p>
+        <button id="agent-login-button" class="w-full max-w-xs mt-4 px-6 py-4 bg-purple-600 hover:bg-purple-700 transition-colors duration-300 rounded-full font-bold text-white shadow-lg">
+            Entrar
+        </button>
     </div>
 
-    <!-- Pantalla de Carga 2: Conectando con el Agente -->
-    <div id="loading-screen-2" class="absolute inset-0 hidden flex-col items-center justify-center space-y-4">
-        <div class="w-12 h-12 border-4 border-gray-400 border-t-purple-600 rounded-full animate-spin-fast"></div>
-        <p class="text-xl sm:text-2xl font-medium">Cargando para conectarte con un representante...</p>
-    </div>
-
-    <!-- Interfaz de Chat (inicialmente oculta) -->
+    <!-- Interfaz de Chat (para Usuario y Agente) -->
     <div id="chat-interface" class="w-full h-full hidden flex-col">
         <!-- Encabezado del chat -->
         <div class="chat-header p-4 border-b border-gray-200 flex items-center justify-between">
             <div class="flex items-center space-x-2">
-                <!-- Ícono de "Atrás" -->
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
                 <h1 class="text-xl font-bold">Inkspired Helped</h1>
             </div>
             <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" 
@@ -138,18 +110,18 @@
         
         <!-- Contenedor de mensajes -->
         <div class="chat-container relative">
-            <!-- Los mensajes se agregarán aquí dinámicamente -->
             <div id="chat-messages" class="flex flex-col"></div>
-            <div class="timer-container p-4 w-full flex flex-col items-center justify-center space-y-2 text-center hidden" id="timer-display">
-                <h2 class="text-xl sm:text-2xl font-bold">Tiempo de espera estimado:</h2>
-                <div id="countdown-timer" class="text-4xl sm:text-6xl font-extrabold text-purple-600">05:00</div>
-                <p class="text-sm text-gray-400 mt-2">Estamos conectándote con un agente real. Por favor, no cierres esta ventana.</p>
-            </div>
         </div>
         
         <!-- Campo de entrada de mensaje -->
-        <div class="p-4 bg-white border-t border-gray-200 flex items-center space-x-2">
-            <input type="text" id="message-input" class="flex-grow bg-gray-100 text-gray-800 placeholder-gray-400 px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Iniciar un mensaje..." disabled>
+        <div id="message-input-area" class="p-4 bg-white border-t border-gray-200 flex items-center space-x-2">
+            <!-- Los botones de mensajes automáticos para el agente se mostrarán aquí -->
+            <div id="agent-tools" class="flex-grow flex space-x-2 hidden">
+                <button data-message="Hola, soy un agente de soporte. ¿En qué puedo ayudarte?" class="auto-message-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm">Mensaje de Bienvenida</button>
+                <button data-message="Estamos investigando su problema. Le mantendremos informado." class="auto-message-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm">Estado del Ticket</button>
+            </div>
+            
+            <input type="text" id="message-input" class="flex-grow bg-gray-100 text-gray-800 placeholder-gray-400 px-4 py-3 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-600" placeholder="Escribe un mensaje..." disabled>
             <button id="send-button" class="bg-purple-600 hover:bg-purple-700 text-white p-3 rounded-full focus:outline-none disabled:bg-gray-400" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -162,95 +134,102 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, onSnapshot, collection, addDoc, serverTimestamp, query, orderBy, doc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // Variables globales y configuración de Firebase
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let db, auth, userId;
-        let ticketId = null;
-        const initialScreen = document.getElementById('initial-screen');
-        const continueButton = document.getElementById('continue-button');
-        const loadingScreen1 = document.getElementById('loading-screen-1');
-        const loadingScreen2 = document.getElementById('loading-screen-2');
+        
+        // Elementos de la interfaz
+        const roleSelectionScreen = document.getElementById('role-selection-screen');
+        const userButton = document.getElementById('user-button');
+        const agentButton = document.getElementById('agent-button');
+        const agentLoginScreen = document.getElementById('agent-login-screen');
+        const agentPasswordInput = document.getElementById('agent-password-input');
+        const agentLoginButton = document.getElementById('agent-login-button');
+        const passwordError = document.getElementById('password-error');
         const chatInterface = document.getElementById('chat-interface');
         const chatMessages = document.getElementById('chat-messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
-        const timerDisplay = document.getElementById('timer-display');
-        const countdownTimer = document.getElementById('countdown-timer');
-        
+        const agentTools = document.getElementById('agent-tools');
+
+        let db, auth, userId, userRole;
+        let selectedChatId = null;
+        const AGENT_PASSWORD = "Inkspired2025";
+        let chatListenerUnsubscribe = null;
+        let userData = {};
+
+        // Mensajes automáticos y pasos para el usuario
+        const steps = [
+            { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", isAgent: true, image: false, delay: 1500 },
+            { text: "¿Podrías proporcionarme tu correo electrónico?", isAgent: true, delay: 1000, waitForUser: true, placeholder: "Tu correo electrónico...", field: "email" },
+            { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", isAgent: true, delay: 1000, waitForUser: true, placeholder: "Tu nombre de usuario...", field: "username" },
+            { text: "Ahora, por favor, describe brevemente tu problema.", isAgent: true, delay: 1000, waitForUser: true, placeholder: "Describe tu problema...", field: "problem" },
+        ];
         let isAutoConversationRunning = false;
         let isWaitingForUserInput = false;
         let currentStepIndex = 0;
-        let userData = {};
 
-        // Mensajes automáticos y pasos
-        const steps = [
-            { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", isAgent: true, image: false, delay: 1500 },
-            { text: "¿Podrías proporcionarme tu correo electrónico?", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Tu correo electrónico...", field: "email" },
-            { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Tu nombre de usuario...", field: "username" },
-            { text: "Ahora, por favor, describe brevemente tu problema.", isAgent: true, delay: 2000, waitForUser: true, placeholder: "Describe tu problema...", field: "problem" },
-            { text: "Entendido, muchas gracias. Haré todo lo posible para resolver tu situación. Te conectaremos con un agente real en breve.", isAgent: true, delay: 2000 },
-        ];
-
-        // Función para agregar un mensaje al chat
-        function addMessageToChat(text, isAgent, image = false, isTyping = false) {
+        // --- Funciones del Chat ---
+        function addMessageToChat(text, sender, isTyping = false, chatWindow = chatMessages) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('flex', 'items-start', 'w-full', 'mb-2');
             
-            if (!isAgent) {
+            if (sender === 'user') {
                 messageDiv.classList.add('justify-end');
-            }
-
-            if (isAgent) {
-                const imgContainer = document.createElement('div');
-                imgContainer.classList.add('w-10', 'h-10', 'rounded-full', 'mr-2', 'flex-shrink-0');
-                if (image) {
-                     imgContainer.innerHTML = `<img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" class="rounded-full w-full h-full object-cover">`;
-                }
-                messageDiv.appendChild(imgContainer);
+            } else if (sender === 'agent') {
+                messageDiv.classList.add('justify-start');
+            } else {
+                messageDiv.classList.add('justify-center');
             }
 
             const bubbleDiv = document.createElement('div');
-            bubbleDiv.classList.add('message-bubble', isAgent ? 'agent-bubble' : 'user-bubble', 'shadow-md');
+            bubbleDiv.classList.add('message-bubble', 'shadow-md');
+            
+            if (sender === 'user') {
+                bubbleDiv.classList.add('user-bubble');
+            } else if (sender === 'agent') {
+                bubbleDiv.classList.add('agent-bubble');
+            } else {
+                 bubbleDiv.classList.add('system-bubble');
+            }
 
             if (isTyping) {
-                bubbleDiv.innerHTML = `
-                    <div class="agent-typing">
-                        <div></div><div></div><div></div>
-                    </div>
-                `;
+                bubbleDiv.innerHTML = `<div class="agent-typing"><div></div><div></div><div></div></div>`;
             } else {
                 bubbleDiv.innerText = text;
             }
             
+            if (sender === 'agent' || sender === 'system') {
+                const imgContainer = document.createElement('div');
+                imgContainer.classList.add('w-10', 'h-10', 'rounded-full', 'mr-2', 'flex-shrink-0', 'flex', 'items-center', 'justify-center');
+                 imgContainer.innerHTML = `<img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" class="rounded-full w-full h-full object-cover">`;
+                 messageDiv.appendChild(imgContainer);
+            }
+
             messageDiv.appendChild(bubbleDiv);
-            
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            chatWindow.appendChild(messageDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
             return bubbleDiv;
         }
 
-        // Simular escritura del agente y enviar mensaje
-        async function typeAndSendMessage(text, image = false) {
-            const typingBubble = addMessageToChat("", true, image, true);
+        async function typeAndSendMessage(text, sender) {
+            const typingBubble = addMessageToChat("", sender, true);
             await new Promise(resolve => setTimeout(resolve, 1000));
             typingBubble.parentNode.innerHTML = '';
-            addMessageToChat(text, true, image);
+            addMessageToChat(text, sender);
         }
 
-        // Manejar el flujo de la conversación automática
+        // --- Lógica del Usuario ---
         async function runAutoConversation() {
             isAutoConversationRunning = true;
             while (currentStepIndex < steps.length) {
                 const step = steps[currentStepIndex];
-                
                 await new Promise(resolve => setTimeout(resolve, step.delay));
-                
-                await typeAndSendMessage(step.text, step.image);
+                await typeAndSendMessage(step.text, 'agent');
                 
                 if (step.waitForUser) {
                     messageInput.placeholder = step.placeholder;
@@ -258,151 +237,169 @@
                     sendButton.disabled = false;
                     messageInput.focus();
                     isWaitingForUserInput = true;
-                    // Pausa la ejecución hasta que el usuario responda
-                    return; 
+                    return;
                 }
                 currentStepIndex++;
             }
-
-            // Si el bucle termina, la conversación automática ha finalizado
             isAutoConversationRunning = false;
-            // Genera y registra el ticket aquí
-            await createSupportTicket();
-            startLiveChat();
-        }
+            // Cuando la conversación automática termina, enviamos la solicitud de chat al agente
+            const newChatId = crypto.randomUUID();
+            selectedChatId = newChatId;
+            const chatRequestMessage = `Un usuario quiere chatear. Problema: ${userData.problem.substring(0, 50)}... Escribe /accept para iniciar la conversación.`;
+            await addDoc(collection(db, `artifacts/${appId}/public/data/chats/${newChatId}/messages`), {
+                text: chatRequestMessage,
+                sender: 'system',
+                isRequest: true,
+                createdAt: serverTimestamp()
+            });
+            addMessageToChat("Tu solicitud de chat ha sido enviada. Espera a que un agente te atienda.", 'system');
+            messageInput.disabled = true;
+            sendButton.disabled = true;
 
-        // Función para crear el ticket de soporte
-        async function createSupportTicket() {
-             ticketId = crypto.randomUUID();
-             const ticketData = {
-                userId: userId,
-                email: userData.email,
-                username: userData.username,
-                problem: userData.problem,
-                status: 'pending',
-                createdAt: serverTimestamp(),
-                ticketId: ticketId
-             };
-             await setDoc(doc(db, `artifacts/${appId}/public/data/tickets`, ticketId), ticketData);
-             addMessageToChat(`Tu solicitud ha sido recibida. Tu número de ticket es: ${ticketId.substring(0, 8)}`, true, true);
+             // Escucha la respuesta del agente
+            if (chatListenerUnsubscribe) chatListenerUnsubscribe();
+            chatListenerUnsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), orderBy('createdAt')), (snapshot) => {
+                snapshot.docChanges().forEach(change => {
+                    const data = change.doc.data();
+                    if (change.type === 'added' && data.sender === 'agent' && !data.isRequest) {
+                        addMessageToChat(data.text, 'agent');
+                        messageInput.disabled = false;
+                        sendButton.disabled = false;
+                    }
+                });
+            });
         }
-
-        function startLiveChat() {
-            timerDisplay.classList.remove('hidden');
-            messageInput.placeholder = "Esperando por un agente...";
+        
+        // --- Lógica del Agente ---
+        function setupAgentPanel() {
+            roleSelectionScreen.style.display = 'none';
+            agentLoginScreen.style.display = 'none';
+            chatInterface.style.display = 'flex';
+            agentTools.classList.remove('hidden');
+            messageInput.placeholder = "Esperando un chat para aceptar...";
             messageInput.disabled = false;
-            sendButton.disabled = false;
-            startTimer(5 * 60); // 5 minutos
+            sendButton.disabled = true;
+            userRole = 'agent';
+            
+            // Unsubscribe de listeners anteriores si los hay
+            if (chatListenerUnsubscribe) chatListenerUnsubscribe();
+            
+            // Escucha las solicitudes de chat
+            chatListenerUnsubscribe = onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats`), orderBy('createdAt', 'desc')), (snapshot) => {
+                snapshot.docChanges().forEach(change => {
+                    if (change.type === 'added') {
+                        const chatId = change.doc.id;
+                        // Escucha los mensajes de la solicitud
+                        onSnapshot(query(collection(db, `artifacts/${appId}/public/data/chats/${chatId}/messages`), orderBy('createdAt')), (chatSnapshot) => {
+                            chatSnapshot.docChanges().forEach(msgChange => {
+                                const data = msgChange.doc.data();
+                                if (msgChange.type === 'added' && data.sender === 'system' && data.isRequest) {
+                                     // Muestra la solicitud en el chat del agente
+                                     addMessageToChat(data.text, 'system');
+                                     selectedChatId = chatId;
+                                     messageInput.placeholder = "Escribe /accept para chatear...";
+                                     sendButton.disabled = false;
+                                }
+                            });
+                        });
+                    }
+                });
+            });
         }
-
-        // Función para el temporizador
-        function startTimer(duration) {
-            let timer = duration, minutes, seconds;
-            const interval = setInterval(() => {
-                minutes = parseInt(timer / 60, 10);
-                seconds = parseInt(timer % 60, 10);
-
-                minutes = minutes < 10 ? "0" + minutes : minutes;
-                seconds = seconds < 10 ? "0" + seconds : seconds;
-
-                countdownTimer.textContent = minutes + ":" + seconds;
-
-                if (--timer < 0) {
-                    clearInterval(interval);
-                    countdownTimer.textContent = "00:00";
-                    addMessageToChat("¡Un agente se ha conectado a la conversación!", true, true);
-                }
-            }, 1000);
-        }
-
-        // Inicializar Firebase
+        
+        // --- Eventos y Inicialización ---
         const app = initializeApp(firebaseConfig);
         db = getFirestore(app);
         auth = getAuth(app);
-
-        // Configuración y manejo del flujo de la página
-        async function setupFlow() {
-             try {
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
                 if (initialAuthToken) {
                     await signInWithCustomToken(auth, initialAuthToken);
                 } else {
                     await signInAnonymously(auth);
                 }
-                
-                userId = auth.currentUser?.uid || crypto.randomUUID();
-                
-                const chatsCollection = collection(db, `artifacts/${appId}/public/data/chats/${userId}/messages`);
-
-                // Escucha en tiempo real los mensajes del administrador
-                onSnapshot(query(chatsCollection, orderBy('timestamp')), (snapshot) => {
-                    snapshot.docChanges().forEach((change) => {
-                        if (change.type === "added") {
-                            const data = change.doc.data();
-                            if (data.sender === 'agent') {
-                                addMessageToChat(data.text, true, true);
-                            }
-                        }
-                    });
-                });
-            } catch (error) {
-                console.error("Error setting up chat: ", error);
             }
-        }
+            userId = auth.currentUser?.uid || crypto.randomUUID();
+        });
+
+        userButton.addEventListener('click', () => {
+            roleSelectionScreen.style.display = 'none';
+            chatInterface.style.display = 'flex';
+            userRole = 'user';
+            runAutoConversation();
+        });
         
-        // Manejar el envío de mensajes del usuario
+        agentButton.addEventListener('click', () => {
+            roleSelectionScreen.style.display = 'none';
+            agentLoginScreen.style.display = 'flex';
+        });
+
+        agentLoginButton.addEventListener('click', () => {
+            const password = agentPasswordInput.value;
+            if (password === AGENT_PASSWORD) {
+                passwordError.style.display = 'none';
+                setupAgentPanel();
+            } else {
+                passwordError.style.display = 'block';
+            }
+        });
+
+        // Event listener para los botones de mensajes automáticos del agente
+        document.querySelectorAll('.auto-message-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                messageInput.value = button.dataset.message;
+                sendButton.click();
+            });
+        });
+
+        // Manejar el envío de mensajes
         sendButton.addEventListener('click', () => {
             const text = messageInput.value.trim();
-            if (text !== '') {
+            if (text === '') return;
+
+            if (userRole === 'user') {
+                // Lógica para el usuario en la conversación automática
                 const currentStep = steps[currentStepIndex];
                 if (currentStep && currentStep.field) {
                     userData[currentStep.field] = text;
                 }
                 
-                addDoc(collection(db, `artifacts/${appId}/public/data/chats/${userId}/messages`), {
-                    text: text,
-                    sender: 'user',
-                    timestamp: serverTimestamp()
-                });
-                addMessageToChat(text, false);
+                addMessageToChat(text, 'user');
                 messageInput.value = '';
-
-                // Si la conversación automática está activa, continúa al siguiente paso
+                
                 if (isAutoConversationRunning && isWaitingForUserInput) {
                     isWaitingForUserInput = false;
                     currentStepIndex++;
                     runAutoConversation();
                 }
+
+            } else if (userRole === 'agent' && selectedChatId) {
+                // Lógica para el agente
+                if (text.toLowerCase() === '/accept') {
+                    // Enviar mensaje de confirmación a ambos chats
+                    addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
+                        text: "¡El agente se ha unido a la conversación!",
+                        sender: 'system',
+                        createdAt: serverTimestamp()
+                    });
+                    addMessageToChat("Has aceptado el chat con el usuario.", 'system');
+                    messageInput.placeholder = "Escribe tu respuesta...";
+                    messageInput.value = '';
+                } else {
+                    addDoc(collection(db, `artifacts/${appId}/public/data/chats/${selectedChatId}/messages`), {
+                        text: text,
+                        sender: 'agent',
+                        createdAt: serverTimestamp()
+                    });
+                    messageInput.value = '';
+                }
             }
         });
         
-        // Manejar el envío de mensajes con la tecla Enter
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendButton.click();
-            }
-        });
-
-        // Manejar el flujo de pantallas
-        continueButton.addEventListener('click', () => {
-            initialScreen.style.display = 'none';
-            loadingScreen1.style.display = 'flex';
-            
-            setTimeout(() => {
-                loadingScreen1.style.display = 'none';
-                loadingScreen2.style.display = 'flex';
-                
-                setTimeout(() => {
-                    loadingScreen2.style.display = 'none';
-                    chatInterface.style.display = 'flex';
-                    runAutoConversation(); // Inicia la secuencia de mensajes automáticos
-                }, 2000); // 2 segundos para la segunda animación
-            }, 2000); // 2 segundos para la primera animación
-        });
-
-        // Inicia la aplicación al cargar la página
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setupFlow();
             }
         });
     </script>
