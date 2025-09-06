@@ -478,18 +478,20 @@
           currentStepIndex++;
         }
         isAutoConversationRunning = false;
-
+      }
+      
+      async function startRealChatFlow(problemDescription) {
         if (!selectedChatId) {
             const newChatId = crypto.randomUUID();
             selectedChatId = newChatId;
-            const meta = { isRequest:true, username:userData.username||null, problem:userData.problem||null, lang:selectedLang, createdAt: serverTimestamp() };
+            const meta = { isRequest:true, username:userData.username||'anónimo', problem:problemDescription || 'No especificado', lang:selectedLang, createdAt: serverTimestamp() };
 
             if (usingRealtime) {
                 const ok = await safeSet(pathChat(newChatId), meta);
                 if (!ok) {
                     addSystem("No se pudo crear la solicitud en la red (ver consola).");
                 } else {
-                    await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${userData.problem||'No especificado'}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
+                    await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${problemDescription}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
                 }
             } else {
                 addSystem("Modo prueba: solicitud simulada (sin conexión real).");
@@ -598,27 +600,38 @@
         try {
           const text = messageInput.value.trim();
           if (!text) return;
+
+          // Muestra el mensaje del usuario de forma inmediata
+          addMessage(text, userRole, null, null, new Date().getTime(), true);
+          messageInput.value = '';
           sendButton.disabled = true;
           messageInput.disabled = true;
           
-          addMessage(text, userRole, null, null, new Date().getTime(), true);
-          messageInput.value = '';
-
           if (userRole === 'user'){
             if (isWaitingForUserInput){
               const step = STEPS[currentStepIndex];
-              if (step && step.field) userData[step.field] = text;
+              if (step && step.field) {
+                userData[step.field] = text;
+              }
+              
               isWaitingForUserInput = false;
               currentStepIndex++;
-              runAutoConversation().catch(e=>console.error("runAutoConversation error after user input", e));
+
+              if (currentStepIndex < STEPS.length) {
+                // Continúa con la conversación automática
+                runAutoConversation();
+              } else {
+                // Se completaron todos los pasos, ahora iniciamos el flujo de chat real.
+                startRealChatFlow(text);
+              }
               return;
             }
 
+            // Esta parte del código se ejecuta para los mensajes normales, después de la fase de preguntas.
             if (!selectedChatId){
               addSystem("Aún no se ha creado el chat. Intenta de nuevo en un momento.");
               sendButton.disabled = false; messageInput.disabled = false; return;
             }
-
             if (usingRealtime){
               const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
               const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
