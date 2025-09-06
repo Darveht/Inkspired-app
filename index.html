@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Asistencia Inkspired - Realtime (estable)</title>
+  <title>Asistencia Inkspired - Realtime (corregido)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; background:#f0f2f5; color:#333; overflow:hidden; display:flex; flex-direction:column; height:100vh; }
+    body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#333;overflow:hidden;display:flex;flex-direction:column;height:100vh;}
     @keyframes pulse-border{0%{box-shadow:0 0 0 0 rgba(100,116,139,0.4);}70%{box-shadow:0 0 0 10px rgba(100,116,139,0);}100%{box-shadow:0 0 0 0 rgba(100,116,139,0);}}
     .icon-animation{animation:pulse-border 2s infinite;}
     .chat-container{flex-grow:1;padding:1rem;overflow-y:auto;display:flex;flex-direction:column;}
@@ -22,7 +22,7 @@
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-  <!-- UI (igual a la tuya) -->
+  <!-- Pantalla de Selección de Rol -->
   <div id="role-selection-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
     <div class="relative w-48 h-48 sm:w-64 sm:h-64 rounded-full flex items-center justify-center bg-gray-200 shadow-xl icon-animation">
       <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" alt="Icono" class="w-32 h-32 sm:w-48 sm:h-48 rounded-full object-cover">
@@ -32,6 +32,7 @@
     <p class="small-note mt-4">Si Firebase falla, la app entra en modo demo para que no se quede paralizada.</p>
   </div>
 
+  <!-- Pantalla de Contraseña de Agente -->
   <div id="agent-login-screen" class="absolute inset-0 hidden flex-col items-center justify-center p-4 text-center">
     <h2 class="text-2xl font-bold mb-4">Acceso de Agente</h2>
     <input id="agent-password-input" type="password" placeholder="Ingresa la clave" class="w-full max-w-xs px-4 py-3 rounded-full border border-gray-300">
@@ -39,6 +40,7 @@
     <button id="agent-login-button" class="w-full max-w-xs mt-4 px-6 py-4 bg-purple-600 hover:bg-purple-700 rounded-full font-bold text-white shadow-lg">Entrar</button>
   </div>
 
+  <!-- Interfaz de Chat -->
   <div id="chat-interface" class="w-full h-full hidden flex-col">
     <div class="chat-header p-4 border-b border-gray-200 flex items-center justify-between">
       <div class="flex items-center space-x-2"><h1 class="text-xl font-bold">Inkspired Helped</h1></div>
@@ -65,7 +67,7 @@
     </div>
   </div>
 
-  <!-- SCRIPT -->
+  <!-- SCRIPT corregido: evita duplicados y asegura entrega -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -84,7 +86,7 @@
     } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
     document.addEventListener('DOMContentLoaded', () => {
-      // ---------- UI elements ----------
+      // ---------- UI ----------
       const roleSelectionScreen = document.getElementById('role-selection-screen');
       const userButton = document.getElementById('user-button');
       const agentButton = document.getElementById('agent-button');
@@ -98,7 +100,7 @@
       const sendButton = document.getElementById('send-button');
       const agentTools = document.getElementById('agent-tools');
 
-      // ---------- Firebase config (tu configuración) ----------
+      // ---------- Firebase config (tu config) ----------
       const firebaseConfig = {
         apiKey: "AIzaSyCFQ_geG0HIv2EZ-bfKc97TJNtf2sdqPzc",
         authDomain: "clack-koder.firebaseapp.com",
@@ -116,16 +118,22 @@
       let selectedChatId = null;
       const AGENT_PASSWORD = "Inkspired2025";
       const ARTIFACT_APP_ID = firebaseConfig.projectId || 'default-app-id';
-      let chatsListenerRef = null;
-      let messagesListenerRef = null;
+      let chatsListenerRef = null, messagesListenerRef = null;
       let usingRealtime = false;
-      let currentStepIndex = 0, isAutoConversationRunning = false, isWaitingForUserInput = false;
+
+      // Set para evitar procesar mensajes dos veces
+      const processedMessageIds = new Set();
+
+      // Pasos automáticos
       const steps = [
         { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", sender: 'agent', delay: 1500 },
         { text: "¿Podrías proporcionarme tu correo electrónico?", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Tu correo electrónico...", field: "email" },
         { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Tu nombre de usuario...", field: "username" },
         { text: "Ahora, por favor, describe brevemente tu problema.", sender: 'agent', delay: 1000, waitForUser: true, placeholder: "Describe tu problema...", field: "problem" },
       ];
+      let currentStepIndex = 0;
+      let isAutoConversationRunning = false;
+      let isWaitingForUserInput = false;
       let userData = {};
 
       // ---------- helpers DB ----------
@@ -133,69 +141,70 @@
       function pathChat(chatId){ return `${pathChatsRoot()}/${chatId}`; }
       function pathChatMessages(chatId){ return `${pathChat(chatId)}/messages`; }
 
-      async function safeDbInit() {
+      async function safeInitFirebase(){
         try {
           app = initializeApp(firebaseConfig);
           auth = getAuth(app);
           db = getDatabase(app);
           usingRealtime = true;
-          console.log("Firebase Realtime inicializado");
-          // signin anónimo (no bloqueante)
+          // login anónimo
           onAuthStateChanged(auth, async (u) => {
             if (!u) {
-              try { await signInAnonymously(auth); }
-              catch(e){ console.warn("signInAnonymously falló:", e); }
+              try { await signInAnonymously(auth); } catch(e){ console.warn("Anon sign-in falló:", e); }
             }
             userId = auth.currentUser?.uid || crypto.randomUUID();
             console.log("UID:", userId);
           });
         } catch (e) {
-          console.error("Inicialización Firebase falló:", e);
-          addMessageToChat("Advertencia: Firebase no pudo inicializarse. Entrando en modo demo (no paraliza UI).", "system");
+          console.error("Firebase init error:", e);
+          addMessageToChat("Advertencia: Firebase no pudo inicializarse. Entrando en modo demo local.", "system");
           usingRealtime = false;
           userId = crypto.randomUUID();
         }
       }
 
-      // safe push / set / update
-      async function dbPush(path, value) {
+      async function dbPush(path, value){
         if (!usingRealtime) return null;
-        try { const p = await push(ref(db, path), value); return p.key || null; }
-        catch(e){ console.error("dbPush:", e); addMessageToChat("Error DB push (ver consola).","system"); return null; }
-      }
-      async function dbSet(path, value) {
-        if (!usingRealtime) return false;
-        try{ await set(ref(db, path), value); return true; } catch(e){ console.error("dbSet:",e); addMessageToChat("Error DB set.","system"); return false; }
-      }
-      async function dbUpdate(path, value) {
-        if (!usingRealtime) return false;
-        try{ await update(ref(db, path), value); return true; } catch(e){ console.error("dbUpdate:",e); addMessageToChat("Error DB update.","system"); return false; }
-      }
-
-      function detachChatsListener(){
-        if (!usingRealtime || !chatsListenerRef) return;
-        try{ off(chatsListenerRef); } catch(e){ console.warn("off chatsListenerRef fallo", e); }
-        chatsListenerRef = null;
-      }
-      function detachMessagesListener(){
-        if (!usingRealtime || !messagesListenerRef) return;
-        try{ off(messagesListenerRef); } catch(e){ console.warn("off messagesListenerRef fallo", e); }
-        messagesListenerRef = null;
+        try {
+          const refRes = await push(ref(db, path), value);
+          // push devuelve una referencia con key
+          return refRes?.key || null;
+        } catch(e){
+          console.error("dbPush:", e);
+          addMessageToChat("Error al enviar a DB (ver consola).", "system");
+          return null;
+        }
       }
 
+      async function dbSet(path, value){
+        if (!usingRealtime) return false;
+        try { await set(ref(db, path), value); return true; } catch(e){ console.error("dbSet:",e); addMessageToChat("Error DB set","system"); return false; }
+      }
+
+      async function dbUpdate(path, value){
+        if (!usingRealtime) return false;
+        try { await update(ref(db, path), value); return true; } catch(e){ console.error("dbUpdate:",e); addMessageToChat("Error DB update","system"); return false; }
+      }
+
+      // Listeners (guardamos la referencia que usamos para off)
       function attachChatsListener(onRequest){
         if (!usingRealtime) return;
         detachChatsListener();
         try {
           const r = ref(db, pathChatsRoot());
           const q = query(r, orderByChild('createdAt'), limitToLast(50));
-          chatsListenerRef = r; // guardamos referencia para off()
+          chatsListenerRef = r;
           onChildAdded(q, (snap) => {
             const data = snap.val();
             if (!data) return;
             if (data.isRequest) onRequest({ chatId: snap.key, ...data });
           });
-        } catch(e){ console.error("attachChatsListener:", e); }
+        } catch(e){ console.error("attachChatsListener:",e); }
+      }
+      function detachChatsListener(){
+        if (!usingRealtime || !chatsListenerRef) return;
+        try { off(chatsListenerRef); } catch(e) { console.warn("off chats fail", e); }
+        chatsListenerRef = null;
       }
 
       function attachMessagesListener(chatId, onMessage){
@@ -205,14 +214,24 @@
           const r = ref(db, pathChatMessages(chatId));
           messagesListenerRef = r;
           onChildAdded(r, (snap) => {
+            const id = snap.key;
+            if (!id) return;
+            // si ya procesamos este id, ignoramos
+            if (processedMessageIds.has(id)) return;
             const data = snap.val();
             if (!data) return;
-            onMessage({ id: snap.key, ...data });
+            processedMessageIds.add(id);
+            onMessage({ id, ...data });
           });
         } catch(e){ console.error("attachMessagesListener:", e); }
       }
+      function detachMessagesListener(){
+        if (!usingRealtime || !messagesListenerRef) return;
+        try { off(messagesListenerRef); } catch(e) { console.warn("off messages fail", e); }
+        messagesListenerRef = null;
+      }
 
-      // ---------- UI mensajes ----------
+      // ---------- UI: mensajes ----------
       function addMessageToChat(text, sender, isTyping=false){
         const messageDiv = document.createElement('div');
         messageDiv.classList.add('flex','items-start','w-full','mb-2');
@@ -239,13 +258,14 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
         return bubble;
       }
+
       async function typeAndSendMessage(text, sender){
         addMessageToChat("", sender, true);
         await new Promise(r => setTimeout(r, 800));
         addMessageToChat(text, sender);
       }
 
-      // ---------- flujo usuario ----------
+      // ---------- lógica usuario ----------
       async function runAutoConversation(){
         if (isAutoConversationRunning) return;
         isAutoConversationRunning = true;
@@ -269,33 +289,37 @@
         // crear chat
         const newChatId = crypto.randomUUID();
         selectedChatId = newChatId;
-        const meta = { isRequest:true, username: userData.username||null, problem: userData.problem||null, createdAt: serverTimestamp() };
+        const chatMeta = { isRequest:true, username:userData.username||null, problem:userData.problem||null, createdAt: serverTimestamp() };
 
         if (usingRealtime){
-          const ok = await dbSet(pathChat(newChatId), meta);
-          if (ok){
-            await dbPush(pathChatMessages(newChatId), { text:`Un usuario solicita chat. Escribe /accept para atender.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
-          } else {
-            addMessageToChat("Error creando solicitud en DB.", "system");
+          const ok = await dbSet(pathChat(newChatId), chatMeta);
+          if (!ok) addMessageToChat("No se pudo crear el chat en DB.", "system");
+          else {
+            const key = await dbPush(pathChatMessages(newChatId), { text:`Un usuario solicita chat. Escribe /accept para atender.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
+            // si key existe, marcamos procesado para evitar que el listener lo añada
+            if (key) processedMessageIds.add(key);
           }
         } else {
           addMessageToChat("Modo demo: solicitud simulada (sin Firebase).", "system");
         }
-        addMessageToChat("Tu solicitud de chat ha sido enviada.", "system");
 
-        // permitir enviar mensajes desde UI
+        addMessageToChat("Tu solicitud de chat ha sido enviada. Espera a que un agente te atienda.", "system");
         messageInput.disabled = false;
         sendButton.disabled = false;
 
-        if (usingRealtime) attachMessagesListener(newChatId, (msg)=>{
-          if (!msg) return;
-          if (msg.sender === 'agent' && !msg.isRequest) addMessageToChat(msg.text, 'agent');
-          if (msg.sender === 'system' && !msg.isRequest) addMessageToChat(msg.text, 'system');
-          if (msg.sender === 'user') addMessageToChat(msg.text, 'user');
-        });
+        // listener de mensajes de este chat (usuario lo necesita para ver respuestas del agente)
+        if (usingRealtime) {
+          attachMessagesListener(newChatId, (msg) => {
+            if (!msg) return;
+            // mostramos según sender
+            if (msg.sender === 'agent') addMessageToChat(msg.text, 'agent');
+            else if (msg.sender === 'system') addMessageToChat(msg.text, 'system');
+            else if (msg.sender === 'user') addMessageToChat(msg.text, 'user');
+          });
+        }
       }
 
-      // ---------- flujo agente ----------
+      // ---------- lógica agente ----------
       function setupAgentPanel(){
         roleSelectionScreen.style.display = 'none';
         agentLoginScreen.style.display = 'none';
@@ -306,17 +330,19 @@
         sendButton.disabled = false;
         userRole = 'agent';
 
-        // escuchar solicitudes
+        // escuchar nuevas solicitudes (el agente recibe todas las requests independientemente de su id)
         if (usingRealtime){
-          attachChatsListener((req)=>{
-            // mostramos la solicitud y vinculamos listeners de mensajes para verla
-            selectedChatId = req.chatId;
-            addMessageToChat(`Solicitud: ${req.username||'anonimo'} - ${req.problem||'No especificado'}. Escribe /accept.`, 'system');
-            // escuchar mensajes de ese chat (previos y nuevos)
-            attachMessagesListener(req.chatId, (m)=>{
-              if (!m) return;
-              if (m.sender === 'user') addMessageToChat(m.text, 'user');
-              if (m.sender === 'system' && !m.isRequest) addMessageToChat(m.text, 'system');
+          attachChatsListener((request) => {
+            // mostrar info de la solicitud
+            selectedChatId = request.chatId;
+            addMessageToChat(`Solicitud: ${request.username || 'anonimo'} - ${request.problem || 'No especificado'}. Escribe /accept para atender.`, 'system');
+
+            // empezar a escuchar mensajes de ese chat (para ver mensajes previos y nuevos)
+            attachMessagesListener(request.chatId, (msg) => {
+              if (!msg) return;
+              if (msg.sender === 'user') addMessageToChat(msg.text, 'user');
+              else if (msg.sender === 'system') addMessageToChat(msg.text, 'system');
+              else if (msg.sender === 'agent') addMessageToChat(msg.text, 'agent');
             });
           });
         } else {
@@ -334,23 +360,20 @@
           userRole = 'user';
           currentStepIndex = 0;
           userData = {};
-          // asegurar inputs activos
           messageInput.disabled = true;
           sendButton.disabled = true;
           runAutoConversation();
-        } catch(e){ console.error("userButton click error:", e); addMessageToChat("Error UI (ver consola).","system"); }
+        } catch(e){ console.error("user click:", e); addMessageToChat("Error UI (ver consola).","system"); }
       });
 
       agentButton.addEventListener('click', () => {
-        try {
-          roleSelectionScreen.style.display = 'none';
-          agentLoginScreen.style.display = 'flex';
-        } catch(e){ console.error("agentButton click error:", e); addMessageToChat("Error UI (ver consola).","system"); }
+        roleSelectionScreen.style.display = 'none';
+        agentLoginScreen.style.display = 'flex';
       });
 
-      agentLoginButton.addEventListener('click', ()=>{
-        const password = agentPasswordInput.value || '';
-        if (password === AGENT_PASSWORD){
+      agentLoginButton.addEventListener('click', () => {
+        const p = agentPasswordInput.value || '';
+        if (p === AGENT_PASSWORD) {
           passwordError.style.display = 'none';
           setupAgentPanel();
         } else {
@@ -358,47 +381,70 @@
         }
       });
 
-      document.querySelectorAll('.auto-message-btn').forEach(b=>{
-        b.addEventListener('click', ()=>{
-          if (userRole === 'agent' && selectedChatId){
-            messageInput.value = b.dataset.message;
+      document.querySelectorAll('.auto-message-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (userRole === 'agent' && selectedChatId) {
+            messageInput.value = btn.dataset.message;
             sendButton.click();
           } else addMessageToChat("Selecciona/acepta un chat antes de usar auto-mensajes.", "system");
         });
       });
 
-      sendButton.addEventListener('click', async ()=>{
+      // Envío de mensajes -> **espera al push** y usa key para evitar duplicados
+      sendButton.addEventListener('click', async () => {
         try {
           const text = messageInput.value.trim();
           if (!text) return;
-          // usuario
-          if (userRole === 'user'){
+
+          // USUARIO
+          if (userRole === 'user') {
+            // guardamos campo si estamos en pasos
             const step = steps[currentStepIndex];
             if (step && step.field) userData[step.field] = text;
-            addMessageToChat(text, 'user');
+
             messageInput.value = '';
-            if (selectedChatId && usingRealtime) {
-              await dbPush(pathChatMessages(selectedChatId), { text, sender: 'user', createdAt: serverTimestamp() });
-            } else if (selectedChatId && !usingRealtime){
-              addMessageToChat("(demo) mensaje local almacenado", "system");
-            } else {
-              // si no existe chat y terminaste pasos, crear uno ahora
-              if (!isWaitingForUserInput && currentStepIndex >= steps.length) await runAutoConversation();
+            // si no hay chat creado, intentar crearlo (si pasos ya terminados)
+            if (!selectedChatId && !isWaitingForUserInput && currentStepIndex >= steps.length) {
+              await runAutoConversation(); // esto crea selectedChatId
+            }
+            if (!selectedChatId) {
+              addMessageToChat("Aún no se ha creado el chat. Espera un momento.", "system");
+              return;
             }
 
-            if (isWaitingForUserInput){
+            if (usingRealtime) {
+              // push y obtener key
+              const key = await dbPush(pathChatMessages(selectedChatId), { text, sender: 'user', createdAt: serverTimestamp() });
+              if (key) {
+                // prevenimos que el listener vuelva a añadir este mismo mensaje
+                processedMessageIds.add(key);
+                // mostramos el mensaje localmente
+                addMessageToChat(text, 'user');
+              } else {
+                addMessageToChat("Error enviando mensaje (revisa consola).", "system");
+              }
+            } else {
+              // demo
+              addMessageToChat(`(demo) ${text}`, 'user');
+            }
+
+            if (isWaitingForUserInput) {
               isWaitingForUserInput = false;
               currentStepIndex++;
               runAutoConversation();
             }
 
-          } else if (userRole === 'agent'){
-            if (!selectedChatId){ addMessageToChat("No hay chat seleccionado.", "system"); return; }
-            if (text.toLowerCase() === '/accept'){
-              if (usingRealtime){
-                await dbUpdate(pathChat(selectedChatId), { isRequest:false, agentId: userId, acceptedAt: serverTimestamp() });
-                await dbPush(pathChatMessages(selectedChatId), { text: `El agente se ha unido a la conversación.`, sender:'system', createdAt: serverTimestamp() });
-                await dbPush(pathChatMessages(selectedChatId), { text: `Ahora estás chateando con el agente.`, sender:'system', createdAt: serverTimestamp() });
+          // AGENTE
+          } else if (userRole === 'agent') {
+            if (!selectedChatId) { addMessageToChat("No hay chat seleccionado.", "system"); return; }
+
+            if (text.toLowerCase() === '/accept') {
+              if (usingRealtime) {
+                await dbUpdate(pathChat(selectedChatId), { isRequest: false, agentId: userId, acceptedAt: serverTimestamp() });
+                const k1 = await dbPush(pathChatMessages(selectedChatId), { text: `El agente se ha unido a la conversación.`, sender: 'system', createdAt: serverTimestamp() });
+                const k2 = await dbPush(pathChatMessages(selectedChatId), { text: `Ahora estás chateando con el agente.`, sender: 'system', createdAt: serverTimestamp() });
+                if (k1) processedMessageIds.add(k1);
+                if (k2) processedMessageIds.add(k2);
               } else {
                 addMessageToChat("(demo) chat aceptado", "system");
               }
@@ -406,29 +452,46 @@
               messageInput.value = '';
               return;
             }
-            // mensaje normal agente
-            if (usingRealtime) await dbPush(pathChatMessages(selectedChatId), { text, sender:'agent', createdAt: serverTimestamp() });
-            else addMessageToChat(`(agente demo) ${text}`, 'agent');
+
+            // mensaje normal del agente
+            if (usingRealtime) {
+              const key = await dbPush(pathChatMessages(selectedChatId), { text, sender: 'agent', createdAt: serverTimestamp() });
+              if (key) {
+                processedMessageIds.add(key);
+                addMessageToChat(text, 'agent');
+              } else {
+                addMessageToChat("Error enviando mensaje (ver consola).", "system");
+              }
+            } else {
+              addMessageToChat(`(agente demo) ${text}`, 'agent');
+            }
             messageInput.value = '';
+
           } else {
             addMessageToChat("Selecciona un rol antes de enviar.", "system");
           }
-        } catch(e){ console.error("sendButton handler error:", e); addMessageToChat("Error enviando mensaje (ver consola).","system"); }
+        } catch(e) {
+          console.error("send error:", e);
+          addMessageToChat("Error enviando mensaje (ver consola).", "system");
+        }
       });
 
-      messageInput.addEventListener('keypress', (e)=>{ if (e.key === 'Enter') sendButton.click(); });
+      messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendButton.click(); });
 
-      // ---------- inicializar firebase (seguro) ----------
-      safeDbInit();
+      // ---------- init seguro ----------
+      safeInitFirebase();
 
-      // cuando el usuario cierra la pestaña
-      window.addEventListener('beforeunload', ()=>{
+      // cleanup listeners on exit
+      window.addEventListener('beforeunload', () => {
         try { detachChatsListener(); detachMessagesListener(); } catch(e){}
       });
 
-      // helper para off de chats/messages (expuestos en closure)
+      // helpers para off - expuestos en closure
       function detachChatsListener(){ if (usingRealtime && chatsListenerRef) try{ off(chatsListenerRef); } catch(e){} chatsListenerRef=null; }
       function detachMessagesListener(){ if (usingRealtime && messagesListenerRef) try{ off(messagesListenerRef); } catch(e){} messagesListenerRef=null; }
+
+      // Mensaje inicial
+      addMessageToChat("Sistema listo. Conexión a Realtime: " + (usingRealtime ? "OK" : "No configurado (demo)"), "system");
     });
   </script>
 </body>
