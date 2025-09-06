@@ -573,16 +573,13 @@
             if (!m) return;
             const isOwnMessage = m.sender === 'user';
             
-            if (m.sender === 'agent' && userRole === 'user'){
+            if (m.sender === 'user' && userRole === 'user'){
+                addMessage(m.text, 'user', null, m.id, m.createdAt, isOwnMessage);
+            } else if (m.sender === 'agent' && userRole === 'user'){
               const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
               addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
             } else if (m.sender === 'system') {
                 addMessage(m.text, 'system', null, m.id, m.createdAt, false);
-            }
-            else if (m.sender === 'user' && userRole === 'agent') {
-              const src = m.lang || selectedLang;
-              const t = await translateWithFallback(m.text, src, selectedLang).catch(()=>m.text);
-              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
             }
           });
         }
@@ -639,7 +636,9 @@
                 if (!m) return;
                 const isOwnMessage = m.sender === 'user';
                 
-                if (m.sender === 'agent' && userRole === 'user'){
+                if (m.sender === 'user' && userRole === 'user'){
+                    addMessage(m.text, 'user', null, m.id, m.createdAt, isOwnMessage);
+                } else if (m.sender === 'agent' && userRole === 'user'){
                   const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
                   addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
                 } else if (m.sender === 'system') {
