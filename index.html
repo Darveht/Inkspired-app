@@ -210,7 +210,8 @@
       let selectedLang = langSelect.value || 'es';
       let isAIActive = false;
       let aiTimer = null;
-      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`; // Gemini API endpoint
+      const apiKey = "";
+      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`; // Gemini API endpoint
 
       // Small utilities
       function logInfo(...args){ console.log("[Inkspired]", ...args); }
@@ -226,8 +227,17 @@
         const date = new Date(timestamp);
         return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
       }
-
+      
+      const messageCache = new Set();
       function addMessage(text, sender, metaHTML, messageId, timestamp, isOwnMessage){
+          if (messageId && messageCache.has(messageId)) {
+            logInfo("Mensaje duplicado detectado, ignorando:", messageId);
+            return;
+          }
+          if (messageId) {
+            messageCache.add(messageId);
+          }
+
         const wrapper = document.createElement('div');
         wrapper.style.display='flex';
         wrapper.style.marginBottom='8px';
@@ -501,10 +511,11 @@
           await new Promise(r => setTimeout(r, 1000));
           hideTypingIndicator();
 
-          addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
           if(usingRealtime) {
             const payload = { text: step.text, lang: 'es', sender: 'agent', createdAt: serverTimestamp() };
             await safePush(pathChatMessages(selectedChatId), payload);
+          } else {
+             addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
           }
           if (step.waitForUser){
             messageInput.placeholder = step.placeholder || "Escribe un mensaje...";
@@ -537,14 +548,14 @@
                 aiTimer = setTimeout(async () => {
                   const chatRef = await get(ref(db, pathChat(selectedChatId)));
                   if (chatRef.exists() && chatRef.val().isRequest) {
-                    addSystem("Un agente no está disponible. El asistente virtual tomará la conversación.");
                     isAIActive = true;
                     // Update Firebase to mark AI as active
                     await safeUpdate(pathChat(selectedChatId), { isAIActive: true });
                     // Send an introductory message from the AI
-                    const aiIntro = "Hola, soy el asistente virtual de Inkspired. Un agente humano no está disponible en este momento. Con gusto te ayudaré con tu problema mientras esperas.";
-                    addMessage(aiIntro, 'agent', null, null, new Date().getTime(), false);
-                    await safePush(pathChatMessages(selectedChatId), { text: aiIntro, lang: 'es', sender: 'agent', isAI: true, createdAt: serverTimestamp() });
+                    const aiIntro = "Un agente no está disponible. El asistente virtual tomará la conversación.";
+                    await safePush(pathChatMessages(selectedChatId), { text: aiIntro, lang: 'es', sender: 'system', isAI: true, createdAt: serverTimestamp() });
+                    const translatedAiIntro = await translateWithFallback(aiIntro, 'es', selectedLang);
+                    await safePush(pathChatMessages(selectedChatId), { text: translatedAiIntro, lang: selectedLang, sender: 'agent', isAI: true, createdAt: serverTimestamp() });
                   }
                 }, AI_TIMEOUT_MS);
             }
@@ -558,19 +569,20 @@
         sendButton.disabled = false;
         
         if (usingRealtime && selectedChatId){
-          attachMessagesListener(selectedChatId, async (msg) => {
-            if (!msg) return;
+          attachMessagesListener(selectedChatId, async (m) => {
+            if (!m) return;
+            const isOwnMessage = m.sender === 'user';
             
-            if (msg.sender === 'agent' && userRole === 'user'){
-              const translated = await translateWithFallback(msg.text, 'es', selectedLang).catch(()=>msg.text);
-              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, msg.id, msg.createdAt, userRole === 'agent');
-            } else if (msg.sender === 'system') {
-                addMessage(msg.text, 'system', null, msg.id, msg.createdAt, false);
+            if (m.sender === 'agent' && userRole === 'user'){
+              const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
+              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
+            } else if (m.sender === 'system') {
+                addMessage(m.text, 'system', null, m.id, m.createdAt, false);
             }
-            else if (msg.sender === 'user' && userRole === 'agent') {
-              const src = msg.lang || selectedLang;
-              const t = await translateWithFallback(msg.text, src, selectedLang).catch(()=>msg.text);
-              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`, msg.id, m.createdAt, userRole === 'user');
+            else if (m.sender === 'user' && userRole === 'agent') {
+              const src = m.lang || selectedLang;
+              const t = await translateWithFallback(m.text, src, selectedLang).catch(()=>m.text);
+              addMessage(t, 'user', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
             }
           });
         }
@@ -653,7 +665,6 @@
         try {
           const text = messageInput.value.trim();
           if (!text) return;
-          addMessage(text, userRole, null, null, new Date().getTime(), true);
           messageInput.value = '';
           messageInput.disabled = true;
           sendButton.disabled = true;
@@ -679,11 +690,12 @@
 
             if (isAIActive) {
                 const aiResponse = await getAIGeneration(text);
-                addMessage(aiResponse, 'agent', null, null, new Date().getTime(), false);
                 if (usingRealtime) {
-                    const translatedText = await translateWithFallback(aiResponse, selectedLang, 'es').catch(()=>aiResponse);
-                    const payload = { text: aiResponse, lang: selectedLang, text_es: translatedText, sender: 'agent', isAI: true, createdAt: serverTimestamp() };
+                    const translatedText = await translateWithFallback(aiResponse, 'es', selectedLang).catch(()=>aiResponse);
+                    const payload = { text: translatedText, lang: selectedLang, text_es: aiResponse, sender: 'agent', isAI: true, createdAt: serverTimestamp() };
                     await safePush(pathChatMessages(selectedChatId), payload);
+                } else {
+                  addMessage(aiResponse, 'agent', null, null, new Date().getTime(), false);
                 }
             } else {
                 // Mensaje a agente humano
