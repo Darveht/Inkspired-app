@@ -627,13 +627,27 @@
           userRole = 'user';
           selectedLang = langSelect.value || 'es';
           refreshUserLangDisplay();
-          currentStepIndex = 0; userData = {}; selectedChatId = null;
+          currentStepIndex = 0; userData = {};
           messagesArea.innerHTML = '';
           messageInput.disabled = true; sendButton.disabled = true;
+
+          // NEW LOGIC: Attach listener before sending first message
           if (usingRealtime) {
             const newChatId = crypto.randomUUID();
             selectedChatId = newChatId;
+            attachMessagesListener(selectedChatId, async (m) => {
+                if (!m) return;
+                const isOwnMessage = m.sender === 'user';
+                
+                if (m.sender === 'agent' && userRole === 'user'){
+                  const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
+                  addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
+                } else if (m.sender === 'system') {
+                    addMessage(m.text, 'system', null, m.id, m.createdAt, false);
+                }
+            });
           }
+
           await runAutoConversation();
         } catch(e) {
           console.error("userButton click error", e);
