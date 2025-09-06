@@ -156,7 +156,8 @@
       let userId = null;
       let userRole = null; // 'user' | 'agent'
       let selectedChatId = null;
-      const processedMessageIds = new Set();
+      // Eliminamos el `Set` de IDs, ya que el nuevo flujo de visualización lo hace innecesario
+      // const processedMessageIds = new Set();
       let chatsListenerRef = null, messagesListenerRef = null;
       let selectedLang = langSelect.value || 'es';
 
@@ -381,10 +382,8 @@
           onChildAdded(r, (snap) => {
             const id = snap.key;
             if (!id) return;
-            if (processedMessageIds.has(id)) return; // already shown locally
             const data = snap.val();
             if (!data) return;
-            processedMessageIds.add(id);
             onMessage({ id, ...data });
           });
         } catch(e){ console.error("attachMessagesListener error", e); }
@@ -417,11 +416,25 @@
       async function runAutoConversation(){
         if (isAutoConversationRunning) return;
         isAutoConversationRunning = true;
-
+        
+        // CORREGIDO: Ahora los mensajes automáticos también se envían a la base de datos
+        // para que el listener los muestre.
         while (currentStepIndex < STEPS.length){
           const step = STEPS[currentStepIndex];
           await new Promise(r => setTimeout(r, step.delay));
-          // addMessage(step.text, 'agent'); // Se quita para que el listener se encargue de mostrarlo
+          
+          if(usingRealtime) {
+            const payload = { text: step.text, lang: 'es', sender: 'agent', createdAt: serverTimestamp() };
+            const key = await safePush(pathChatMessages(selectedChatId), payload);
+            if (key) {
+              // La visualización se hará a través del listener
+            } else {
+              addSystem("Error al enviar mensaje automático (ver consola).");
+            }
+          } else {
+            addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
+          }
+
           if (step.waitForUser){
             messageInput.placeholder = step.placeholder || "Escribe un mensaje...";
             messageInput.disabled = false; sendButton.disabled = false;
@@ -445,7 +458,6 @@
                     addSystem("No se pudo crear la solicitud en la red (ver consola).");
                 } else {
                     const key = await safePush(pathChatMessages(newChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${userData.problem||'No especificado'}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
-                    if (key) processedMessageIds.add(key);
                 }
             } else {
                 addSystem("Modo prueba: solicitud simulada (sin conexión real).");
@@ -461,7 +473,10 @@
         if (usingRealtime && selectedChatId){
           attachMessagesListener(selectedChatId, async (msg) => {
             if (!msg) return;
-            if (msg.sender === 'user' && processedMessageIds.has(msg.id)) {
+            
+            // Solo muestra los mensajes que no sean del usuario local para evitar duplicados
+            const isOwnMessage = (userRole === 'user' && msg.sender === 'user') || (userRole === 'agent' && msg.sender === 'agent');
+            if (isOwnMessage) {
                 return;
             }
 
@@ -513,7 +528,7 @@
       }
 
       // Event listeners UI
-      userButton.addEventListener('click', () => {
+      userButton.addEventListener('click', async () => {
         try {
           roleSelectionScreen.style.display = 'none';
           chatScreen.style.display = 'flex';
@@ -523,7 +538,12 @@
           currentStepIndex = 0; userData = {}; selectedChatId = null;
           messagesArea.innerHTML = '';
           messageInput.disabled = true; sendButton.disabled = true;
-          runAutoConversation().catch(e => console.error("runAutoConversation error", e));
+          // Creación de chat para mensajes iniciales
+          if (usingRealtime) {
+            const newChatId = crypto.randomUUID();
+            selectedChatId = newChatId;
+          }
+          await runAutoConversation().catch(e => console.error("runAutoConversation error", e));
         } catch(e) {
           console.error("userButton click error", e);
           addSystem("Error en interfaz (revisa consola).");
@@ -561,6 +581,10 @@
             if (isWaitingForUserInput){
               const step = STEPS[currentStepIndex];
               if (step && step.field) userData[step.field] = text;
+              
+              // Muestra el mensaje del usuario de forma inmediata
+              addMessage(text, 'user', null, null, new Date().getTime(), true);
+
               messageInput.value = '';
               isWaitingForUserInput = false;
               currentStepIndex++;
@@ -574,16 +598,14 @@
             }
 
             if (usingRealtime){
+              // Muestra el mensaje del usuario de forma inmediata
+              addMessage(text, 'user', null, null, new Date().getTime(), true);
+              
               const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
               const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
-              const key = await safePush(pathChatMessages(selectedChatId), payload);
-              if (key){
-                processedMessageIds.add(key);
-              } else {
-                addSystem("Error enviando mensaje (ver consola).");
-              }
+              await safePush(pathChatMessages(selectedChatId), payload);
             } else {
-              addMessage(`(prueba) ${text}`, 'user');
+              addMessage(`(prueba) ${text}`, 'user', null, null, new Date().getTime(), true);
             }
             messageInput.value = '';
 
@@ -595,9 +617,8 @@
             if (text.toLowerCase() === '/accept'){
               if (usingRealtime){
                 await safeUpdate(pathChat(selectedChatId), { isRequest:false, agentId:userId, acceptedAt: serverTimestamp() });
-                const k1 = await safePush(pathChatMessages(selectedChatId), { text: "El agente se ha unido a la conversación.", sender:'system', createdAt: serverTimestamp() });
-                const k2 = await safePush(pathChatMessages(selectedChatId), { text: "Ahora estás chateando con el agente.", sender:'system', createdAt: serverTimestamp() });
-                if (k1) processedMessageIds.add(k1); if (k2) processedMessageIds.add(k2);
+                await safePush(pathChatMessages(selectedChatId), { text: "El agente se ha unido a la conversación.", sender:'system', createdAt: serverTimestamp() });
+                await safePush(pathChatMessages(selectedChatId), { text: "Ahora estás chateando con el agente.", sender:'system', createdAt: serverTimestamp() });
               } else addSystem("(prueba) chat aceptado");
               messageInput.placeholder = "Escribe tu respuesta...";
               messageInput.value = '';
@@ -606,15 +627,13 @@
             }
 
             if (usingRealtime){
+              // Muestra el mensaje del agente de forma inmediata
+              addMessage(text, 'agent', null, null, new Date().getTime(), true);
+
               const payload = { text, lang:'es', sender:'agent', createdAt: serverTimestamp() };
-              const key = await safePush(pathChatMessages(selectedChatId), payload);
-              if (key){
-                processedMessageIds.add(key);
-              } else {
-                addSystem("Error al enviar mensaje (ver consola).");
-              }
+              await safePush(pathChatMessages(selectedChatId), payload);
             } else {
-              addMessage(`(agente-prueba) ${text}`, 'agent');
+              addMessage(`(agente-prueba) ${text}`, 'agent', null, null, new Date().getTime(), true);
             }
             messageInput.value = '';
           } else {
