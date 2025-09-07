@@ -1,781 +1,767 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Asistencia Inkspired — Multilenguaje (estable)</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Bosque Oscuro: Siren Head</title>
   <style>
-    body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#111;margin:0;height:100vh;display:flex;flex-direction:column;}
-    .center-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px; text-align: center;}
-    .panel{background:#fff;padding:20px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,0.08);max-width:920px;width:100%;}
-    .top-bar{display:flex;justify-content:flex-end;padding:12px 16px;}
-    .small-note{font-size:12px;color:#6b7280;}
-    .chat-container{flex:1;overflow:auto;padding:16px;background:#f8fafc;}
-    .message-bubble{max-width:80%;padding:.75rem 1rem;border-radius:1rem;margin-bottom:.5rem;word-wrap:break-word; position: relative;}
-    .agent-bubble{background:#fff;color:#111;align-self:flex-start;border:1px solid #e5e7eb;}
-    .user-bubble{background:#e9f5ff;color:#111;align-self:flex-end;margin-left:auto;border:1px solid #bae6fd;}
-    .system-bubble{background:#fff7ed;color:#744210;text-align:center;align-self:center;padding:.5rem .75rem;border-radius:.75rem;border:1px solid #fcd34d;}
-    .controls{display:flex;gap:.5rem;align-items:center;}
-    select.lang-select{padding:.35rem .6rem;border:1px solid #e5e7eb;border-radius:.5rem;background:#fff;}
-    input[type="text"], input[type="password"]{padding:.6rem .8rem;border-radius:999px;border:1px solid #e5e7eb;background:#f3f4f6;outline:none;width:100%;}
-    button.btn{padding:.6rem .9rem;border-radius:999px;border:none;cursor:pointer;}
-    button.btn:disabled{opacity:.5;cursor:not-allowed;}
-    .header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #eef2f7;background:#fff;}
-    .app-name{font-weight:700;}
-    .disclaimer{font-size:12px;color:#374151;background:#fff7ed;padding:.6rem .8rem;border-radius:.5rem;border:1px solid #fbbf24;margin-top:12px;}
+    html,body { margin:0; height:100%; overflow:hidden; background:#000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    #gameCanvas { width:100%; height:100%; display:block; touch-action:none; }
     
-    .message-time {
-      font-size: 10px;
-      color: #9ca3af;
-      margin-top: 4px;
-      text-align: right;
+    /* --- Pantalla de Carga --- */
+    #loading-screen {
+      position: absolute; inset: 0; background: #000; z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      color: #fff; transition: opacity 0.5s ease-out;
     }
+    #loading-screen.fade-out { opacity: 0; pointer-events: none; }
+    #loading-screen h1 {
+      font-size: clamp(2.5rem, 8vw, 4.5rem); margin-bottom: 2rem; letter-spacing: 2px;
+      text-shadow: 0 0 15px rgba(255, 80, 80, 0.4); font-weight: 600;
+    }
+    #loading-progress-container { width: 80%; max-width: 400px; text-align: center; }
+    #loading-text { margin-bottom: 0.5rem; font-size: 0.9rem; color: #ccc; }
+    #loading-bar { width: 100%; height: 4px; background: rgba(255, 255, 255, 0.1); }
+    #loading-bar-fill { width: 0%; height: 100%; background: #fff; transition: width 0.3s ease-out; }
+    #start-button {
+      display: none; margin-top: 2rem; padding: 12px 24px; font-size: 1.1rem; color: #fff;
+      background: transparent; border: 2px solid rgba(255, 255, 255, 0.5);
+      border-radius: 4px; cursor: pointer; transition: background 0.2s, border-color 0.2s;
+    }
+    #start-button:hover { background: rgba(255, 255, 255, 0.1); border-color: #fff; }
 
-    /* Typing indicator styles */
-    .typing-indicator {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: #f0f4f8;
-      border-radius: 1rem;
-      padding: 0.75rem 1rem;
-      max-width: fit-content;
-      margin-bottom: 0.5rem;
-    }
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background-color: #94a3b8;
-      border-radius: 50%;
-      animation: bounce 1.4s infinite ease-in-out both;
-    }
-    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
+    /* --- UI del Juego (inicialmente oculta) --- */
+    .game-ui { display: none; }
+    .ui { position: absolute; left: 10px; top: 10px; color: #fff; z-index: 40; text-shadow: 0 0 8px rgba(0,0,0,0.9); }
+    #battery { width: 200px; height: 18px; background: rgba(255,255,255,0.12); border-radius: 9px; overflow:hidden; border: 1px solid rgba(255,255,255,0.08); }
+    #batteryFill { height:100%; width:100%; background: linear-gradient(90deg,#ffd24a,#ff7a4a); transition: width 0.2s linear; }
+    #btnFlash { margin-top:8px; display:inline-block; padding:8px 12px; background:rgba(255,255,255,0.06); border-radius:8px; border:1px solid rgba(255,255,255,0.06); color:#fff; font-weight:600; user-select:none; }
+    #message { margin-top:8px; color:#f4f4f4; font-size:13px; opacity:0.95; }
+    .joystick { position: absolute; left: 12px; bottom: 12px; width: 130px; height:130px; z-index:30; touch-action:none; display:flex; align-items:center; justify-content:center; }
+    .joy-base { width:120px; height:120px; border-radius:50%; background: rgba(255,255,255,0.04); border: 2px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center; position:relative; }
+    .joy-knob { width:56px; height:56px; border-radius:50%; background: rgba(255,255,255,0.08); transform: translate(0,0); transition: transform 0.02s linear; }
+    .look-note { position:absolute; right:12px; bottom:12px; z-index:30; color:#fff; font-size:12px; opacity:0.8; }
+    #darkOverlay { position:absolute; inset:0; background: radial-gradient(circle at center, rgba(0,0,0,0) 18%, rgba(0,0,0,0.85) 60%); pointer-events:none; z-index:35; opacity:0; transition: opacity 0.5s ease; }
+    #tip { position:absolute; left:50%; transform:translateX(-50%); bottom:140px; color:#fff; z-index:30; font-size:13px; opacity:0.85;}
+    #shockOverlay { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:50; transition: opacity 0.6s ease; opacity:0; }
+    #skull { font-size: 10vw; filter: drop-shadow(0 6px 20px rgba(0,0,0,0.9)); transform: scale(0.02); transition: transform 0.6s cubic-bezier(.2,.9,.3,1), opacity 0.3s ease; opacity:0; will-change: transform, opacity; }
+    .shock-active #gameCanvas { filter: grayscale(1) contrast(0.9) brightness(0.9); }
+    .shock-active #skull { opacity:1; transform: scale(1.8); font-size: 28vw; }
 
-    /* Full-screen landing page styles */
-    .landing-page {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      width: 100vw;
-      background: #f0f2f5;
-      padding: 20px;
-    }
+    /* overlay rojo para intensidad */
+    #redTint { position:absolute; inset:0; pointer-events:none; z-index:90; background: rgba(0,0,0,0); opacity:0; transition: opacity 0.6s; }
 
-    /* Spinning circle animation for logo */
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .spinning-logo {
-      border-radius: 50%;
-      animation: spin 5s linear infinite;
+    /* animaciones y responsivo */
+    @media (max-width:700px){
+      #loading-progress-container { width:92%; padding:14px; }
     }
   </style>
 </head>
 <body>
-  <div class="top-bar">
-    <div id="connection-status" class="small-note">Inicializando...</div>
+
+  <div id="loading-screen">
+    <h1>Bosque Oscuro</h1>
+    <div id="loading-progress-container">
+      <div id="loading-text">Cargando recursos...</div>
+      <div id="loading-bar"><div id="loading-bar-fill"></div></div>
+    </div>
+    <button id="start-button">Comenzar Juego</button>
   </div>
 
-  <!-- SELECCIÓN INICIAL: idioma + rol -->
-  <div id="role-selection-screen" class="landing-page">
-    <div class="panel" role="dialog" aria-modal="true" style="display:flex;flex-direction:column;gap:12px;">
-      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;">
-        <img src="https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw" alt="logo" class="spinning-logo" style="width:96px;height:96px;object-fit:cover;">
-        <div>
-          <div class="app-name text-2xl">Inkspired Helped</div>
-          <div class="small-note">Soporte no oficial — ayuda y sugerencias para Galo</div>
-        </div>
-      </div>
+  <canvas id="gameCanvas"></canvas>
 
-      <div style="display:flex;justify-content:center;gap:12px;margin-top:12px;">
-        <label for="lang-select" class="small-note" style="margin-right:6px;">Idioma</label>
-        <select id="lang-select" class="lang-select" aria-label="Seleccionar idioma">
-          <option value="es">Español (es)</option>
-          <option value="en">English (en)</option>
-          <option value="pt">Português (pt)</option>
-          <option value="de">Deutsch (de)</option>
-        </select>
-      </div>
-      
-      <div style="display:flex;gap:12px;flex-direction:column;align-items:stretch;margin-top:24px;">
-        <button id="user-button" class="btn" style="background:#7c3aed;color:white;font-weight:700;">Continuar como Usuario</button>
-        <button id="agent-button" class="btn" style="background:#374151;color:white;font-weight:700;">Entrar como Agente</button>
-        <div class="disclaimer">Soporte no oficial: Este chat no es una alianza ni un acuerdo con Inkspired. Soy un ayudante para facilitar procesos y sugerencias que pueden dirigirse a Galo (creador).</div>
-      </div>
-    </div>
+  <div id="redTint"></div>
+
+  <div class="ui game-ui">
+    <div id="battery"><div id="batteryFill"></div></div>
+    <div id="btnFlash">Linterna: ON (F)</div>
+    <div id="message">Batería: <span id="batteryNights">30.0</span> noches · <span id="batteryText">3600</span>s</div>
   </div>
-
-  <!-- LOGIN AGENTE -->
-  <div id="agent-login-screen" class="center-screen" style="display:none">
-    <div class="panel">
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <h2 style="margin:0">Acceso de Agente</h2>
-        <input id="agent-password-input" type="password" placeholder="Ingresa la clave">
-        <div style="display:flex;gap:8px;">
-          <button id="agent-login-button" class="btn" style="background:#7c3aed;color:white;">Entrar</button>
-          <button id="agent-login-cancel" class="btn" style="background:#e5e7eb;">Cancelar</button>
-        </div>
-        <div id="password-error" class="small-note" style="color:#dc2626;display:none">Clave incorrecta.</div>
-      </div>
-    </div>
+  <div id="tip" class="game-ui">Usa joystick (izq) para moverte y arrastra a la derecha para mirar</div>
+  <div class="joystick game-ui" id="joystick">
+    <div class="joy-base"><div class="joy-knob" id="joyKnob"></div></div>
   </div>
+  <div class="look-note game-ui">Arrastra aquí para mirar</div>
+  <div id="darkOverlay"></div>
+  <div id="shockOverlay"><div id="skull">💀</div></div>
 
-  <!-- INTERFAZ DE CHAT -->
-  <div id="chat-screen" style="display:none;flex-direction:column;height:100vh;">
-    <div class="header">
-      <div class="app-name">Inkspired Helped</div>
-      <div id="user-lang-display" class="small-note"></div>
-    </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
 
-    <div id="messages-area" class="chat-container" aria-live="polite"></div>
+  <script>
+  // ---------- PRESERVÉ TU CÓDIGO ORIGINAL Y AÑADÍ LO NECESARIO ----------
+  // Estados: LOADING, INTRO, FINALE, PLAYING
+  let gameState = 'LOADING';
 
-    <!-- Typing indicator -->
-    <div id="typing-indicator" style="display:none;">
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-      </div>
-    </div>
+  // Configuración base (mantuve tus constantes originales)
+  const nightDuration = 120.0, batteryLife = nightDuration * 30.0, treesCount = 120;
+  const forestRadius = 120, playerHeight = 1.6, moveSpeed = 2.8, runSpeed = 4.6;
+  const riversCount = 2, riverSegmentLength = 8, shockIntervalMs = 30000, shockDurationMs = 10000;
+  const introDuration = 14.0; // segundos para la cinemática dron (ajustable)
 
-    <div style="padding:12px;border-top:1px solid #eef2f7;background:#fff;display:flex;gap:8px;align-items:center;">
-      <input id="message-input" type="text" placeholder="Escribe un mensaje..." disabled>
-      <button id="send-button" class="btn" style="background:#7c3aed;color:white;" disabled>Enviar</button>
-    </div>
-  </div>
+  // Elementos DOM
+  const loadingScreen = document.getElementById('loading-screen');
+  const startButton = document.getElementById('start-button');
+  const gameUiElements = document.querySelectorAll('.game-ui');
+  const loadingBarFill = document.getElementById('loading-bar-fill');
+  const redTint = document.getElementById('redTint');
 
-  <!-- SCRIPT: robusto, no bloqueante -->
-  <script type="module">
-    // IMPORTS Firebase modular (v11)
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import {
-      getDatabase, ref, push, set, update, onChildAdded, off, query, orderByChild, limitToLast, serverTimestamp, remove, get
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+  // Renderer & Canvas (arreglé la referencia a canvas para pointerlock)
+  const canvas = document.getElementById('gameCanvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
 
-    document.addEventListener('DOMContentLoaded', () => {
-      // UI refs
-      const roleSelectionScreen = document.getElementById('role-selection-screen');
-      const userButton = document.getElementById('user-button');
-      const agentButton = document.getElementById('agent-button');
-      const agentLoginScreen = document.getElementById('agent-login-screen');
-      const agentLoginBtn = document.getElementById('agent-login-button');
-      const agentLoginCancel = document.getElementById('agent-login-cancel');
-      const agentPasswordInput = document.getElementById('agent-password-input');
-      const passwordError = document.getElementById('password-error');
-      const langSelect = document.getElementById('lang-select');
+  // ESCENA
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x000012, 0.012);
 
-      const chatScreen = document.getElementById('chat-screen');
-      const messagesArea = document.getElementById('messages-area');
-      const messageInput = document.getElementById('message-input');
-      const sendButton = document.getElementById('send-button');
-      const connectionStatus = document.getElementById('connection-status');
-      const userLangDisplay = document.getElementById('user-lang-display');
-      const typingIndicator = document.getElementById('typing-indicator');
+  // Cámaras: mantengo la cámara "player" original (camera),
+  // y añado cámaras para la cinemática (droneCam, planetCam, rocketCam, groundCam).
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1200); // player camera (igual que antes)
+  const droneCam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 2000);
+  const planetCam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 3000);
+  const rocketCam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 3000);
+  const groundCam = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 3000);
 
-      // Configuration
-      const LIBRE_TRANSLATE_URL = "https://libretranslate.de/translate"; // fallback public endpoint
-      const FIREBASE_CONFIG = {
-        apiKey: "AIzaSyCFQ_geG0HIv2EZ-bfKc97TJNtf2sdqPzc",
-        authDomain: "clack-koder.firebaseapp.com",
-        databaseURL: "https://clack-koder-default-rtdb.firebaseio.com",
-        projectId: "clack-koder",
-        storageBucket: "clack-koder.firebasestorage.app",
-        messagingSenderId: "478151254938",
-        appId: "1:478151254938:web:e2c00e3a5426bd192b9023",
-        measurementId: "G-P29ME5Z3S1"
-      };
-      const AGENT_PASSWORD = "Inkspired2025";
-      const ARTIFACT_APP_ID = FIREBASE_CONFIG.projectId || 'default-app-id';
-      const AI_TIMEOUT_MS = 30000; // 30 segundos para activar la IA
+  // activeCamera es la que renderizamos; por defecto la cámara del player, pero durante la INTRO usaremos droneCam y luego otras.
+  let activeCamera = droneCam;
 
-      // State
-      let usingRealtime = false;
-      let app = null, db = null, auth = null;
-      let userId = null;
-      let userRole = null; // 'user' | 'agent'
-      let selectedChatId = null;
-      let chatsListenerRef = null, messagesListenerRef = null;
-      let selectedLang = langSelect.value || 'es';
-      let isAIActive = false;
-      let aiTimer = null;
-      const apiKey = "";
-      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`; // Gemini API endpoint
+  // Luces (preservadas)
+  const hemi = new THREE.HemisphereLight(0x40405a, 0x060616, 0.6);
+  scene.add(hemi);
+  const moonGeo = new THREE.SphereGeometry(8, 32, 32);
+  const moonMat = new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0x8b0000, emissiveIntensity: 1.8, roughness: 0.8 });
+  const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  moonMesh.position.set(-70, 80, -120);
+  scene.add(moonMesh);
+  const moonLight = new THREE.DirectionalLight(0xffb0b0, 0.12);
+  moonLight.position.copy(moonMesh.position);
+  moonLight.castShadow = true;
+  scene.add(moonLight);
 
-      // Small utilities
-      function logInfo(...args){ console.log("[Inkspired]", ...args); }
+  // Estrellas (preservadas)
+  (function makeStars(count=900){ const positions = new Float32Array(count * 3);const radius = 600;for (let i=0;i<count;i++){const theta = Math.random() * Math.PI * 2;const phi = Math.acos((Math.random()*2)-1);const r = radius * (0.9 + Math.random()*0.2);const x = Math.sin(phi) * Math.cos(theta) * r;const y = Math.sin(phi) * Math.sin(theta) * r;const z = Math.cos(phi) * r;positions[i*3+0] = x;positions[i*3+1] = y + 80;positions[i*3+2] = z;}const geom = new THREE.BufferGeometry();geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.9, sizeAttenuation: true, depthWrite: false });const pts = new THREE.Points(geom, mat);scene.add(pts);})();
 
-      function addSystem(text){
-        const div = document.createElement('div'); div.className = 'system-bubble message-bubble'; div.innerText = text;
-        const wrapper = document.createElement('div'); wrapper.style.display='flex'; wrapper.style.justifyContent='center'; wrapper.style.marginBottom='8px';
-        wrapper.appendChild(div); messagesArea.appendChild(wrapper); messagesArea.scrollTop = messagesArea.scrollHeight;
+  // Terreno (preservado)
+  const groundGeo = new THREE.PlaneGeometry(2000, 2000, 150, 150);
+  const groundMat = new THREE.ShaderMaterial({
+    uniforms:{moonLightPos:{value:moonLight.position}},
+    vertexShader:`varying vec3 vPosition;varying vec3 vNormal;float random(vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);}float noise(vec2 st){vec2 i=floor(st);vec2 f=fract(st);vec2 u=f*f*(3.0-2.0*f);return mix(random(i),random(i+vec2(1.0,0.0)),u.x)+(random(i+vec2(0.0,1.0))-random(i))*u.y*(1.0-u.x)+(random(i+vec2(1.0,1.0))-random(i+vec2(1.0,0.0)))*u.y*u.x;}void main(){vPosition=position;vNormal=normal;float displacement=noise(position.xz*0.1)*0.5+noise(position.xz*0.4)*0.15;vec3 newPosition=position+normal*displacement;gl_Position=projectionMatrix*modelViewMatrix*vec4(newPosition,1.0);}`,
+    fragmentShader:`varying vec3 vPosition;varying vec3 vNormal;uniform vec3 moonLightPos;float random(vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);}float noise(vec2 st){vec2 i=floor(st);vec2 f=fract(st);vec2 u=f*f*(3.0-2.0*f);return mix(random(i),random(i+vec2(1.0,0.0)),u.x)+(random(i+vec2(0.0,1.0))-random(i))*u.y*(1.0-u.x)+(random(i+vec2(1.0,1.0))-random(i+vec2(1.0,0.0)))*u.y*u.x;}float fbm(vec2 st){float value=0.0;float amplitude=0.5;for(int i=0;i<4;i++){value+=amplitude*noise(st);st*=2.0;amplitude*=0.5;}return value;}void main(){vec3 dirtColor1=vec3(0.25,0.18,0.15);vec3 dirtColor2=vec3(0.35,0.25,0.20);vec3 mossColor=vec3(0.18,0.22,0.15);vec2 worldPos=vPosition.xz;float n1=fbm(worldPos*0.05);float n2=fbm(worldPos*0.35);vec3 color=mix(dirtColor1,dirtColor2,n1);color=mix(color,mossColor,smoothstep(0.55,0.75,n2)*0.6);vec3 lightDir=normalize(moonLightPos-vPosition);float diff=max(dot(vNormal,lightDir),0.2);vec3 finalColor=color*diff;gl_FragColor=vec4(finalColor,1.0);}`
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Grupo de árboles (preservado, usado en animación de caida)
+  const treeGroup = new THREE.Group();
+  scene.add(treeGroup);
+  const treeCollisionSpheres = [];
+
+  function makeTree() { 
+    const tree = new THREE.Group(); 
+    const trunkColor = new THREE.Color(0x5a3a22).lerp(new THREE.Color(0x3a2211), Math.random() * 0.4); 
+    const leavesColor = new THREE.Color(0x1a3a1a).lerp(new THREE.Color(0x2a5a2a), Math.random() * 0.6); 
+    const trunkMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.9, metalness: 0.1 }); 
+    const leavesMat = new THREE.MeshStandardMaterial({ color: leavesColor, roughness: 0.8, flatShading: true }); 
+    const trunkHeight = 6 + Math.random() * 5; 
+    const trunkRadius = 0.2 + Math.random() * 0.2; 
+    const trunkGeo = new THREE.CylinderGeometry(trunkRadius * 0.7, trunkRadius, trunkHeight, 8); 
+    const pos = trunkGeo.attributes.position; 
+    for (let i = 0; i < pos.count; i++) { 
+      const y = pos.getY(i); 
+      const factor = (y + trunkHeight/2) / trunkHeight;  
+      const radiusScale = 1.0 - factor * 0.3; 
+      let x = pos.getX(i) * radiusScale; let z = pos.getZ(i) * radiusScale; 
+      const bend = Math.sin(factor * Math.PI) * 0.5; 
+      x += bend; pos.setXYZ(i, x, y, z); 
+    } 
+    trunkGeo.computeVertexNormals(); 
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = trunkHeight / 2; tree.add(trunk); 
+    const branchesCount = 4 + Math.floor(Math.random() * 4); 
+    for (let i = 0; i < branchesCount; i++) { 
+      const branchStartY = trunkHeight * (0.4 + Math.random() * 0.5); 
+      const branchAngleY = Math.random() * Math.PI * 2; 
+      const branchLength = 2.5 + Math.random() * 2; 
+      const branchRadius = trunkRadius * (0.3 + Math.random() * 0.3); 
+      const branchGeo = new THREE.CylinderGeometry(branchRadius * 0.5, branchRadius, branchLength, 6); 
+      branchGeo.translate(0, branchLength / 2, 0); 
+      const branch = new THREE.Mesh(branchGeo, trunkMat); 
+      branch.position.set(0, branchStartY, 0); 
+      branch.rotation.z = (Math.PI / 2) - (0.4 + Math.random() * 0.5); 
+      branch.rotation.y = branchAngleY; tree.add(branch); 
+      const leafClump = new THREE.Group(); 
+      for(let j=0; j < 3 + Math.floor(Math.random() * 4); j++) { 
+        const leafGeo = new THREE.IcosahedronGeometry(1.0 + Math.random() * 0.8, 0); 
+        const leaf = new THREE.Mesh(leafGeo, leavesMat); 
+        leaf.position.set((Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5); 
+        leaf.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI); leafClump.add(leaf); 
+      } 
+      const endOfBranch = new THREE.Vector3(0, branchLength, 0); endOfBranch.applyEuler(branch.rotation); 
+      leafClump.position.copy(branch.position).add(endOfBranch); tree.add(leafClump); 
+    } 
+    for(let k=0; k < 4 + Math.floor(Math.random() * 5); k++) { 
+      const leafGeo = new THREE.IcosahedronGeometry(1.5 + Math.random(), 0); 
+      const leaf = new THREE.Mesh(leafGeo, leavesMat); 
+      leaf.position.set((Math.random() - 0.5) * 2.5, trunkHeight + (Math.random() - 0.2) * 2.0, (Math.random() - 0.5) * 2.5); 
+      tree.add(leaf); 
+    } 
+    return tree; 
+  }
+  for (let i=0;i<treesCount;i++){ 
+    const angle = Math.random()*Math.PI*2; const r = 10 + Math.random()* (forestRadius - 10); const x = Math.cos(angle)*r; const z = Math.sin(angle)*r; if (Math.hypot(x,z) < 6) continue; const t = makeTree(); t.position.set(x, 0, z); const s = 0.8 + Math.random()*0.9; t.scale.setScalar(s); t.rotation.y = Math.random()*Math.PI*2; treeGroup.add(t); const colRad = 1.2 * s; treeCollisionSpheres.push({ pos: new THREE.Vector3(x, 1.0, z), r: colRad }); 
+  }
+
+  // Rocas
+  for (let i=0;i<40;i++){ 
+    const rockGeo = new THREE.IcosahedronGeometry(1, 0); 
+    const pos = rockGeo.attributes.position; 
+    for(let j=0; j<pos.count; j++){ pos.setXYZ(j, pos.getX(j) + (Math.random()-0.5)*0.2, pos.getY(j) + (Math.random()-0.5)*0.2, pos.getZ(j) + (Math.random()-0.5)*0.2); } 
+    const b = new THREE.Mesh(rockGeo, new THREE.MeshStandardMaterial({color:0x232323, flatShading:true})); 
+    const ang = Math.random()*Math.PI*2, rr = 6 + Math.random()*forestRadius; b.position.set(Math.cos(ang)*rr, 0.1, Math.sin(ang)*rr); b.rotation.y = Math.random()*Math.PI; const sc = 0.2 + Math.random()*0.4; b.scale.set(sc,sc,sc); scene.add(b); 
+  }
+
+  // Ríos (preservados)
+  for (let r=0;r<riversCount;r++){ 
+    function randomRiverPath(centerX, centerZ, lengthSegments=12, bend=12) { const pts = []; let x = centerX, z = centerZ; let angle = Math.random()*Math.PI*2; for (let i=0;i<lengthSegments;i++){ x += Math.cos(angle) * (riverSegmentLength * (0.7 + Math.random()*0.6)); z += Math.sin(angle) * (riverSegmentLength * (0.7 + Math.random()*0.6)); angle += (Math.random()-0.5) * (bend*0.02); pts.push(new THREE.Vector3(x, 0.05, z)); } return pts; } 
+    function buildRiverMesh(pathPoints, width) { const segments = pathPoints.length;const pos = new Float32Array((segments*2) * 3);const uvs = new Float32Array((segments*2) * 2);const indices = [];for (let i=0;i<segments;i++){const p = pathPoints[i];const next = pathPoints[Math.min(i+1, segments-1)];const prev = pathPoints[Math.max(i-1, 0)];const t = new THREE.Vector3().subVectors(next, prev).normalize();const left = new THREE.Vector3(-t.z, 0, t.x).normalize();const half = width * (0.5 + (Math.sin(i*0.5)*0.12));const leftPos = new THREE.Vector3().copy(p).addScaledVector(left, half);const rightPos = new THREE.Vector3().copy(p).addScaledVector(left, -half);pos[(i*2+0)*3+0] = leftPos.x; pos[(i*2+0)*3+1] = leftPos.y; pos[(i*2+0)*3+2] = leftPos.z;pos[(i*2+1)*3+0] = rightPos.x; pos[(i*2+1)*3+1] = rightPos.y; pos[(i*2+1)*3+2] = rightPos.z;const v = i / (segments-1);uvs[(i*2+0)*2+0] = 0; uvs[(i*2+0)*2+1] = v * 6;uvs[(i*2+1)*2+0] = 1; uvs[(i*2+1)*2+1] = v * 6;if (i < segments-1) {const a = i*2, b = i*2+1, c = (i+1)*2, d = (i+1)*2+1;indices.push(a,b,c); indices.push(b,d,c);}}const geom = new THREE.BufferGeometry();geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));geom.setIndex(indices);geom.computeVertexNormals();const mat = new THREE.ShaderMaterial({uniforms: {time: { value: 0.0 },baseColor: { value: new THREE.Color(0x223b5a) },highlight: { value: new THREE.Color(0x7fb3ff) },opacity: { value: 0.85 }},vertexShader: `varying vec2 vUv;varying vec3 vPos;void main(){vUv = uv;vPos = position;gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);}`,fragmentShader: `uniform float time;uniform vec3 baseColor;uniform vec3 highlight;uniform float opacity;varying vec2 vUv;varying vec3 vPos;void main(){float wave = sin(vUv.y * 12.0 + time * 2.0) * 0.08;float stripe = smoothstep(0.0, 0.6, sin(vUv.x * 10.0 + time * 3.0) * 0.5 + 0.5);vec3 col = mix(baseColor, highlight, 0.35 * stripe + 0.25*wave);float edge = smoothstep(0.0, 0.12, abs(vUv.x-0.5));col *= (1.0 - 0.25*edge);gl_FragColor = vec4(col, opacity);}`,transparent: true,depthWrite: false,side: THREE.DoubleSide});const mesh = new THREE.Mesh(geom, mat);mesh.renderOrder = 1;return mesh;}
+    const startX = (Math.random()-0.5) * 40; const startZ = (Math.random()-0.5) * 40; const path = randomRiverPath(startX, startZ, 14 + Math.floor(Math.random()*8)); const width = 3 + Math.random()*4; const riverMesh = buildRiverMesh(path, width); scene.add(riverMesh); if (!window._rivers) window._rivers = []; window._rivers.push(riverMesh);
+  }
+
+  // --- Modelo Siren Head (preservado) ---
+  function createSirenHead() {
+    const group = new THREE.Group();
+    const material = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+    const bodyGeo = new THREE.CylinderGeometry(0.1, 0.2, 18, 6);
+    const body = new THREE.Mesh(bodyGeo, material);
+    body.position.y = 9;
+    
+    const armGeo = new THREE.CylinderGeometry(0.08, 0.08, 12, 6);
+    const leftArm = new THREE.Mesh(armGeo, material);
+    leftArm.position.set(-0.5, 15, 0);
+    leftArm.rotation.z = Math.PI / 4;
+    const rightArm = leftArm.clone();
+    rightArm.position.x = 0.5;
+    rightArm.rotation.z = -Math.PI / 4;
+
+    const legGeo = new THREE.CylinderGeometry(0.15, 0.1, 10, 6);
+    const leftLeg = new THREE.Mesh(legGeo, material);
+    leftLeg.position.set(-0.3, -5, 0);
+    const rightLeg = leftLeg.clone();
+    rightLeg.position.x = 0.3;
+
+    const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+    const pole = new THREE.Mesh(poleGeo, material);
+    pole.position.y = 18.5;
+
+    const sirenGeo = new THREE.ConeGeometry(0.4, 0.8, 8);
+    const siren1 = new THREE.Mesh(sirenGeo, material);
+    siren1.position.set(0, 19.5, 0.3);
+    siren1.rotation.x = Math.PI / 2.5;
+    const siren2 = siren1.clone();
+    siren2.position.z = -0.3;
+    siren2.rotation.x = -Math.PI / 2.5;
+
+    group.add(body, leftArm, rightArm, leftLeg, rightLeg, pole, siren1, siren2);
+    return group;
+  }
+  const sirenHead = createSirenHead();
+  sirenHead.position.set(-45, 5, -110); // Posición lejana para la intro
+  scene.add(sirenHead);
+
+  // --- Linterna y UI (preservadas) ---
+  const flashlight = new THREE.SpotLight(0xfff3d9, 3.0, 22, Math.PI * 0.36, 0.9, 1);
+  scene.add(flashlight); scene.add(flashlight.target);
+  let flashlightOn = true; let currentBattery = batteryLife;
+  const batteryFill = document.getElementById('batteryFill'); const batteryText = document.getElementById('batteryText');
+  const batteryNights = document.getElementById('batteryNights'); const btnFlash = document.getElementById('btnFlash');
+  const darkOverlay = document.getElementById('darkOverlay');
+  function updateUI(){ const pct = Math.max(0, Math.min(1, currentBattery / batteryLife)); batteryFill.style.width = `${Math.round(pct*100)}%`; batteryText.textContent = Math.ceil(currentBattery); const nightsLeft = (currentBattery / nightDuration); batteryNights.textContent = nightsLeft.toFixed(1); btnFlash.textContent = `Linterna: ${flashlightOn ? 'ON (F)' : 'OFF (F)'}`; darkOverlay.style.opacity = flashlightOn ? (1 - pct) * 0.95 : 1.0; }
+  updateUI();
+  btnFlash.addEventListener('click', ()=>{ flashlightOn = !flashlightOn; flashlight.visible = flashlightOn && currentBattery > 0; updateUI(); });
+  window.addEventListener('keydown', (e)=>{ if (gameState === 'PLAYING' && e.key.toLowerCase() === 'f') { flashlightOn = !flashlightOn; flashlight.visible = flashlightOn && currentBattery > 0; updateUI(); } });
+
+  // --- Controls originales (preservados) ---
+  const moveState = { forward:0, right:0, running:false }; let yaw = 0, pitch = 0;
+  const joyKnob = document.getElementById('joyKnob');
+  const joy = { active:false, id:null, startX:0, startY:0, dx:0, dy:0 };
+  function joyStart(touch){ joy.active = true; joy.id = touch.identifier; joy.startX = touch.clientX; joy.startY = touch.clientY; joy.dx = 0; joy.dy = 0; }
+  function joyMove(touch) { const max = 46; const dx = touch.clientX - joy.startX; const dy = touch.clientY - joy.startY; const dist = Math.sqrt(dx*dx + dy*dy); const clamped = Math.min(max, dist); const nx = dx / (dist||1) * clamped; const ny = dy / (dist||1) * clamped; joy.dx = nx; joy.dy = ny; joyKnob.style.transform = `translate(${nx}px, ${ny}px)`; moveState.forward = -ny / max; moveState.right = nx / max; }
+  function joyEnd() { joy.active = false; joy.id = null; joy.dx = joy.dy = 0; joyKnob.style.transform = `translate(0px, 0px)`; moveState.forward = 0; moveState.right = 0; }
+  const lookPointer = { down:false, id:null, startX:0, startY:0 };
+  window.addEventListener('touchstart', (ev)=>{if(gameState !== 'PLAYING') return; for (const t of ev.changedTouches) { if (t.clientX < window.innerWidth * 0.5 && !joy.active) { joyStart(t); } else { lookPointer.down = true; lookPointer.id = t.identifier; lookPointer.startX = t.clientX; lookPointer.startY = t.clientY; } } }, {passive:false});
+  window.addEventListener('touchmove', (ev)=>{if(gameState !== 'PLAYING') return; ev.preventDefault(); for (const t of ev.changedTouches) { if (joy.active && t.identifier === joy.id) { joyMove(t); } else if (lookPointer.id === t.identifier) { const dx = t.clientX - lookPointer.startX; const dy = t.clientY - lookPointer.startY; lookPointer.startX = t.clientX; lookPointer.startY = t.clientY; yaw -= dx * 0.0022; pitch -= dy * 0.0020; pitch = Math.max(-1.2, Math.min(0.65, pitch)); } } }, {passive:false});
+  window.addEventListener('touchend', (ev)=>{if(gameState !== 'PLAYING') return; for (const t of ev.changedTouches) { if (joy.active && t.identifier === joy.id) joyEnd(); if (lookPointer.id === t.identifier) { lookPointer.down = false; lookPointer.id = null; } } });
+  window.addEventListener('mousedown', (e)=>{if(gameState !== 'PLAYING') return; if (e.clientX > window.innerWidth * 0.45) { lookPointer.down = true; lookPointer.startX = e.clientX; lookPointer.startY = e.clientY; } });
+  window.addEventListener('mousemove', (e)=>{if(gameState !== 'PLAYING' || document.pointerLockElement !== canvas) return; if (lookPointer.down) { const dx = e.clientX - lookPointer.startX; const dy = e.clientY - lookPointer.startY; lookPointer.startX = e.clientX; lookPointer.startY = e.clientY; yaw -= dx * 0.0022; pitch -= dy * 0.0020; pitch = Math.max(-1.2, Math.min(0.65, pitch)); } });
+  window.addEventListener('mouseup', ()=>{if(gameState !== 'PLAYING') return; lookPointer.down = false; });
+  canvas.addEventListener('click', ()=> { if (gameState === 'PLAYING' && document.pointerLockElement !== canvas && !isMobile()) { canvas.requestPointerLock?.(); } });
+  function onPointerMove(e){ yaw -= e.movementX * 0.0022; pitch -= e.movementY * 0.0020; pitch = Math.max(-1.2, Math.min(0.65, pitch)); }
+  document.addEventListener('pointerlockchange', ()=>{ if (document.pointerLockElement === canvas) { document.addEventListener('mousemove', onPointerMove); } else { document.removeEventListener('mousemove', onPointerMove); } });
+  const keys = {}; window.addEventListener('keydown', (e)=>{ keys[e.key.toLowerCase()] = true; }); window.addEventListener('keyup', (e)=>{ keys[e.key.toLowerCase()] = false; });
+  function applyKeyboard() { if (isMobile() || gameState !== 'PLAYING') return; moveState.forward = 0; moveState.right = 0; moveState.running = false; if (keys['w'] || keys['arrowup']) moveState.forward = 1; if (keys['s'] || keys['arrowdown']) moveState.forward = -1; if (keys['a'] || keys['arrowleft']) moveState.right = -1; if (keys['d'] || keys['arrowright']) moveState.right = 1; if (keys['shift']) moveState.running = true; }
+  function collide(position) { for (const c of treeCollisionSpheres) { const dist = Math.hypot(position.x - c.pos.x, position.z - c.pos.z); if (dist < (c.r + 0.34)) return true; } return false; }
+
+  const clock = new THREE.Clock();
+  let shockInterval;
+
+  // --- Cinemática de Introducción (DRON) ---
+  const introPath = [
+    { pos: new THREE.Vector3(0, 80, 50), lookAt: new THREE.Vector3(0, 0, 0) },
+    { pos: new THREE.Vector3(40, 40, -10), lookAt: new THREE.Vector3(0, 5, -50) },
+    { pos: new THREE.Vector3(20, 10, -60), lookAt: sirenHead.position.clone().setY(10) },
+    { pos: new THREE.Vector3(-15, 5, -80), lookAt: sirenHead.position.clone().setY(15) }
+  ];
+
+  function easeInOut(t){ return t<0.5 ? 2*t*t : -1 + (4-2*t)*t; }
+
+  function updateIntro() {
+    const elapsed = Math.min(introDuration, clock.getElapsedTime());
+    const progressRaw = Math.min(1.0, elapsed / introDuration);
+    const progress = easeInOut(progressRaw);
+    const segmentCount = introPath.length - 1;
+    const segmentProgress = progress * segmentCount;
+    const currentSegment = Math.floor(segmentProgress);
+    const segmentLerp = segmentProgress - currentSegment;
+
+    if (currentSegment < segmentCount) {
+        const start = introPath[currentSegment];
+        const end = introPath[currentSegment + 1];
+        // mover droneCam durante la intro en lugar de la cámara del jugador
+        droneCam.position.lerpVectors(start.pos, end.pos, segmentLerp);
+        const lookAtTarget = new THREE.Vector3().lerpVectors(start.lookAt, end.lookAt, segmentLerp);
+        droneCam.lookAt(lookAtTarget);
+        activeCamera = droneCam;
+    }
+
+    if (progressRaw >= 1.0 && gameState === 'INTRO') {
+      // aquí no saltamos directamente a PLAYING: ejecutamos la secuencia épica (finale)
+      gameState = 'FINALE';
+      // iniciamos la secuencia asíncrona del finale
+      runFinaleSequence().catch(err => { console.error(err); finalizeToPlay(); });
+    }
+  }
+
+  // =========================
+  // SECUENCIA FINALE (Cinemática épica)
+  // =========================
+  // Objetos que usará la secuencia:
+  let rocket = null;
+  let planet = null;
+  let activeMeteors = [];
+
+  // Funciones utilitarias para animaciones sencillas
+  function animateGeneric(duration, onUpdate, easing=(t=>t)) {
+    return new Promise(resolve=>{
+      const start = performance.now();
+      function frame(now){
+        const tRaw = Math.min(1, (now - start) / duration);
+        const t = easing(tRaw);
+        onUpdate(t, tRaw);
+        if (tRaw < 1) requestAnimationFrame(frame);
+        else resolve();
       }
-      
-      function formatTimestampToTime(timestamp) {
-        if (!timestamp) return '';
-        const date = new Date(timestamp);
-        return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      }
-      
-      const messageCache = new Set();
-      function addMessage(text, sender, metaHTML, messageId, timestamp, isOwnMessage){
-          if (messageId && messageCache.has(messageId)) {
-            logInfo("Mensaje duplicado detectado, ignorando:", messageId);
-            return;
-          }
-          if (messageId) {
-            messageCache.add(messageId);
-          }
+      requestAnimationFrame(frame);
+    });
+  }
+  function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
-        const wrapper = document.createElement('div');
-        wrapper.style.display='flex';
-        wrapper.style.marginBottom='8px';
-        wrapper.style.alignItems='flex-start';
-        if (sender === 'user') {
-          wrapper.style.justifyContent='flex-end';
-        } else {
-          wrapper.style.justifyContent='flex-start';
-        }
-        
-        if (sender !== 'user'){
-          const avatar = document.createElement('div');
-          avatar.style.width='40px';
-          avatar.style.height='40px';
-          avatar.style.borderRadius='50%';
-          avatar.style.marginRight='8px';
-          avatar.style.backgroundImage = "url('https://play-lh.googleusercontent.com/nV-WEi2R84Kv9r6QUq1RY5tc2ZfZW7jSOtnTHktugSZCEVhFYjVRLjxH88Vh_23WMII=w240-h480-rw')";
-          avatar.style.backgroundSize = 'cover';
-          avatar.style.backgroundPosition='center';
-          wrapper.appendChild(avatar);
-        } else {
-          const spacer = document.createElement('div');
-          spacer.style.width='48px';
-          wrapper.appendChild(spacer);
-        }
+  // create rocket (simple mesh)
+  function createRocket(){
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,6,12), new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.3 }));
+    body.position.y = 3; body.castShadow = true;
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.9,1.8,12), new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.6 }));
+    nose.position.y = 6.2; nose.castShadow = true;
+    g.add(body, nose);
+    return g;
+  }
 
-        const bubble = document.createElement('div');
-        bubble.className = 'message-bubble ' + (sender === 'user' ? 'user-bubble' : (sender === 'agent' ? 'agent-bubble' : 'system-bubble'));
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.innerText = text;
-        
-        const metaDiv = document.createElement('div');
-        metaDiv.style.display = 'flex';
-        metaDiv.style.justifyContent = 'flex-end';
-        metaDiv.style.alignItems = 'center';
-        metaDiv.style.gap = '8px';
-        
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'message-time';
-        timeSpan.innerText = formatTimestampToTime(timestamp);
+  // create planet (simple sphere)
+  function createPlanet(radius=18, color=0x222222){
+    const mat = new THREE.MeshStandardMaterial({ color, roughness:0.9, metalness:0.02 });
+    const p = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 24), mat);
+    p.castShadow = false; p.receiveShadow = false;
+    return p;
+  }
 
-        metaDiv.appendChild(timeSpan);
-
-        if (metaHTML){
-          const small = document.createElement('div');
-          small.style.fontSize='12px';
-          small.style.color='#6b7280';
-          small.style.marginTop='6px';
-          small.innerHTML = metaHTML;
-          metaDiv.appendChild(small);
-        }
-        
-        bubble.appendChild(contentDiv);
-        bubble.appendChild(metaDiv);
-
-        wrapper.appendChild(bubble);
-        messagesArea.appendChild(wrapper);
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-
-        if(isOwnMessage && messageId && usingRealtime) {
-          let lastTouchTime = 0;
-          bubble.addEventListener('touchstart', (e) => {
-            const currentTime = new Date().getTime();
-            const timeDiff = currentTime - lastTouchTime;
-
-            if (timeDiff < 300 && timeDiff > 0) {
-              e.preventDefault();
-              logInfo(`Doble toque detectado para eliminar el mensaje con ID: ${messageId}`);
-              safeRemove(pathChatMessages(selectedChatId, messageId));
-            }
-            lastTouchTime = currentTime;
-          });
-          bubble.addEventListener('dblclick', (e) => {
-            e.preventDefault();
-            logInfo(`Doble clic detectado para eliminar el mensaje con ID: ${messageId}`);
-            safeRemove(pathChatMessages(selectedChatId, messageId));
-          });
-        }
-      }
-
-      function showTypingIndicator() {
-        typingIndicator.style.display = 'block';
-        messagesArea.scrollTop = messagesArea.scrollHeight;
-      }
-
-      function hideTypingIndicator() {
-        typingIndicator.style.display = 'none';
-      }
-
-      // TRANSLATION: non-blocking helpers
-      async function translateWithFallback(text, source, target){
-        if (!text || source === target) return text;
-        try {
-          const r = await fetch(LIBRE_TRANSLATE_URL, {
-            method:'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ q:text, source, target, format:'text' })
-          });
-          const j = await r.json();
-          if (j && j.translatedText) return j.translatedText;
-          if (Array.isArray(j) && j[0] && j[0].translatedText) return j[0].translatedText;
-        } catch(e){ console.warn("LibreTranslate failed:", e); }
-        return text;
-      }
-
-      async function getAIGeneration(prompt) {
-        showTypingIndicator();
-        const payload = {
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          systemInstruction: {
-            parts: [{ text: "Eres un agente de soporte virtual para Inkspired. Debes responder de manera amigable, profesional y concisa. Si no sabes la respuesta, dirás que lo escalarás a un agente humano en cuanto esté disponible. Tu objetivo es ayudar al usuario de la mejor manera posible." }]
-          },
-        };
-
-        try {
-            const response = await fetch(apiEndpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                console.error("Error en la llamada a la API de IA:", await response.text());
-                return "Disculpe, hubo un problema al conectar con el asistente virtual. Por favor, intente de nuevo más tarde.";
-            }
-
-            const result = await response.json();
-            const candidate = result.candidates?.[0];
-            const text = candidate?.content?.parts?.[0]?.text;
-            return text || "No pude generar una respuesta en este momento.";
-        } catch (e) {
-            console.error("Error al obtener respuesta de la IA:", e);
-            return "Disculpe, hubo un problema de red. Por favor, intente de nuevo.";
-        } finally {
-            hideTypingIndicator();
-        }
-      }
-
-      // FIREBASE safe init
-      (async function initRealtime(){
-        try {
-          app = initializeApp(FIREBASE_CONFIG);
-          auth = getAuth(app);
-          db = getDatabase(app);
-          usingRealtime = true;
-          connectionStatus.innerText = "Conexión en tiempo real: OK";
-          onAuthStateChanged(auth, async (u) => {
-            if (!u) {
-              try { await signInAnonymously(auth); } catch(e){ console.warn("signin anon error", e); }
-            }
-            userId = auth.currentUser?.uid || crypto.randomUUID();
-            logInfo("UID", userId);
-          });
-          logInfo("Firebase inicializado (Realtime)");
-        } catch(e){
-          usingRealtime = false;
-          connectionStatus.innerText = "Modo prueba (sin conexión real)";
-          userId = crypto.randomUUID();
-          logInfo("No se pudo inicializar Realtime:", e);
-          addSystem("La conexión en tiempo real no está disponible — modo prueba activado.");
+  // explosion particles
+  function spawnExplosionParticles(pos, count=60, color=0xffaa66, speedBase=80){
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    scene.add(group);
+    for (let i=0;i<count;i++){
+      const s = 0.2 + Math.random()*1.2;
+      const mat = new THREE.MeshStandardMaterial({ color, emissive:color, emissiveIntensity:0.7, roughness:0.6 });
+      const m = new THREE.Mesh(new THREE.SphereGeometry(s, 8, 6), mat);
+      m.position.set(0,0,0);
+      const dir = new THREE.Vector3((Math.random()-0.5),(Math.random()*0.9),(Math.random()-0.5)).normalize();
+      const speed = speedBase*(0.5 + Math.random()*1.2);
+      group.add(m);
+      (async function animatePart(){
+        const t0 = performance.now();
+        const life = 800 + Math.random()*900;
+        while(true){
+          const t = (performance.now()-t0)/life;
+          if (t >= 1){ if (m.parent) group.remove(m); break; }
+          m.position.copy(dir).multiplyScalar(speed * t * 0.01);
+          m.material.opacity = 1 - t;
+          m.material.transparent = true;
+          await new Promise(r=>requestAnimationFrame(r));
         }
       })();
+    }
+    // quitar grupo cuando vacío
+    (async ()=>{
+      const wait = 2000;
+      await sleep(wait);
+      if (group.parent) scene.remove(group);
+    })();
+  }
 
-      // DB path helpers
-      function pathChatsRoot(){ return `artifacts/${ARTIFACT_APP_ID}/public/data/chats`; }
-      function pathChat(chatId){ return `${pathChatsRoot()}/${chatId}`; }
-      function pathChatMessages(chatId, messageId = ''){ return `${pathChat(chatId)}/messages/${messageId}`; }
-
-      // DB wrappers
-      async function safePush(path, payload){
-        if (!usingRealtime) return null;
-        try {
-          const refRes = await push(ref(db, path), payload);
-          return refRes?.key || null;
-        } catch(e){
-          console.error("safePush error", e);
-          return null;
+  // planet fragments (grandes) para explosion
+  function spawnPlanetFragments(center, count=30){
+    for (let i=0;i<count;i++){
+      const s = 1.4 + Math.random()*3.0;
+      const mat = new THREE.MeshStandardMaterial({ color:0xffcc99, emissive:0xff7744, emissiveIntensity:0.6, roughness:0.6 });
+      const frag = new THREE.Mesh(new THREE.IcosahedronGeometry(s,0), mat);
+      frag.position.copy(center);
+      scene.add(frag);
+      const dir = new THREE.Vector3((Math.random()-0.5),(Math.random()-0.2),(Math.random()-0.5)).normalize();
+      const vel = 60 + Math.random()*140;
+      (async ()=>{
+        const t0 = performance.now(); const life = 1600 + Math.random()*1200;
+        while(true){
+          const t = (performance.now()-t0)/life;
+          if (t > 1){ if (frag.parent) scene.remove(frag); break; }
+          frag.position.addScaledVector(dir, vel * 0.001 * (1 + t*2));
+          frag.rotation.x += 0.03; frag.rotation.y += 0.02;
+          frag.material.opacity = 1 - t; frag.material.transparent = true;
+          await new Promise(r=>requestAnimationFrame(r));
         }
+      })();
+    }
+  }
+
+  // spawn meteors (falling rocks)
+  function spawnMeteor(startPos, targetPos, speed=140, size=1.6){
+    const mat = new THREE.MeshStandardMaterial({ color:0x553322, roughness:0.92 });
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), mat);
+    rock.position.copy(startPos);
+    rock.castShadow = true;
+    const dir = new THREE.Vector3().subVectors(targetPos, startPos).normalize();
+    rock.userData = { dir, vel: speed*(0.95+Math.random()*0.4), target: targetPos.clone(), spawn: performance.now(), life: 8000 };
+    scene.add(rock);
+    activeMeteors.push(rock);
+    return rock;
+  }
+
+  // meteors update (mover y comprobar impacto)
+  function updateMeteors(dtMs){
+    for (let i = activeMeteors.length - 1; i >= 0; i--){
+      const m = activeMeteors[i];
+      const ud = m.userData;
+      const step = ud.dir.clone().multiplyScalar(ud.vel * dtMs * 0.001);
+      m.position.add(step);
+      m.rotation.x += 0.02; m.rotation.y += 0.04;
+      // impacto
+      if (m.position.y <= ud.target.y + 0.2 || (performance.now() - ud.spawn) > ud.life){
+        spawnExplosionParticles(m.position.clone(), 40, 0xff9944, 100);
+        flashAt(m.position, 0xffbb88, 1.2);
+        if (m.parent) scene.remove(m);
+        activeMeteors.splice(i,1);
       }
-      async function safeSet(path, payload){
-        if (!usingRealtime) return false;
-        try { await set(ref(db, path), payload); return true; } catch(e){ console.error("safeSet error", e); return false; }
-      }
-      async function safeUpdate(path, payload){
-        if (!usingRealtime) return false;
-        try { await update(ref(db, path), payload); return true; } catch(e){ console.error("safeUpdate error", e); return false; }
-      }
-      
-      async function safeRemove(path) {
-        if (!usingRealtime) return false;
-        try {
-          await remove(ref(db, path));
-          logInfo(`Mensaje eliminado con éxito.`);
-          return true;
-        } catch(e) {
-          console.error(`Error al eliminar el mensaje: ${e}`);
-          return false;
-        }
-      }
+    }
+  }
 
-      // Listeners management
-      function attachChatsListener(onRequest){
-        if (!usingRealtime) return;
-        detachChatsListener();
-        try {
-          const r = ref(db, pathChatsRoot());
-          const q = query(r, orderByChild('createdAt'), limitToLast(50));
-          chatsListenerRef = r;
-          onChildAdded(q, (snap) => {
-            const data = snap.val();
-            if (!data) return;
-            if (data.isRequest) onRequest({ chatId: snap.key, ...data });
-          });
-        } catch(e){ console.error("attachChatsListener error", e); }
-      }
-      function detachChatsListener(){
-        if (!usingRealtime || !chatsListenerRef) return;
-        try { off(chatsListenerRef); } catch(e){ console.warn("off chats fail", e); }
-        chatsListenerRef = null;
-      }
+  // flash light helper
+  function flashAt(pos, color=0xffcc88, intensity=1.2){
+    const l = new THREE.PointLight(color, intensity, 220, 2);
+    l.position.copy(pos).y += 2;
+    scene.add(l);
+    const start = performance.now();
+    (function animateLight(){
+      const t = (performance.now()-start) / 700;
+      if (t > 1){ if (l.parent) scene.remove(l); return; }
+      l.intensity = intensity * (1 - t);
+      requestAnimationFrame(animateLight);
+    })();
+  }
 
-      function attachMessagesListener(chatId, onMessage){
-        if (!usingRealtime) return;
-        detachMessagesListener();
-        try {
-          const r = ref(db, pathChatMessages(chatId));
-          messagesListenerRef = r;
-          onChildAdded(r, (snap) => {
-            const id = snap.key;
-            if (!id) return;
-            const data = snap.val();
-            if (!data) return;
-            onMessage({ id, ...data });
-          });
-        } catch(e){ console.error("attachMessagesListener error", e); }
-      }
-      function detachMessagesListener(){
-        if (!usingRealtime || !messagesListenerRef) return;
-        try { off(messagesListenerRef); } catch(e){ console.warn("off messages fail", e); }
-        messagesListenerRef = null;
-      }
+  // quitar objetos de escena seguro
+  function safeRemove(obj){ try{ if (obj && obj.parent) obj.parent.remove(obj); } catch(e){} }
 
-      // UI updates for language display
-      function refreshUserLangDisplay(){
-        const map = { es:'Español', en:'English', pt:'Português', de:'Deutsch' };
-        userLangDisplay.innerText = `Idioma: ${map[selectedLang] || selectedLang}`;
-      }
-      refreshUserLangDisplay();
+  // Quake (cámara temblor)
+  function quakeScene(ms){
+    return new Promise(resolve=>{
+      const start = performance.now();
+      const orig = activeCamera.position.clone();
+      (function frame(now){
+        const t = (now - start) / ms;
+        if (t >= 1){ activeCamera.position.copy(orig); resolve(); return; }
+        const intensity = (1 - t) * 12;
+        activeCamera.position.x = orig.x + (Math.random()-0.5)*intensity;
+        activeCamera.position.y = orig.y + (Math.random()-0.5)*(intensity*0.4);
+        activeCamera.position.z = orig.z + (Math.random()-0.5)*intensity;
+        requestAnimationFrame(frame);
+      })();
+    });
+  }
 
-      // FLOW: Automated assistant steps
-      const STEPS_BASE = [
-        { text: "Hola, soy un asistente virtual de Inkspired. ¿En qué puedo ayudarte?", sender:'agent', delay:1500 },
-        { text: "¿Podrías proporcionarme tu correo electrónico?", sender:'agent', delay:1000, waitForUser:true, placeholder:"Tu correo electrónico...", field:"email" },
-        { text: "Por favor, ingresa tu nombre de usuario de Inkspired.", sender:'agent', delay:1000, waitForUser:true, placeholder:"Tu nombre de usuario...", field:"username" },
-        { text: "Ahora, por favor, describe brevemente tu problema.", sender:'agent', delay:1000, waitForUser:true, placeholder:"Describe tu problema...", field:"problem" }
-      ];
-      let STEPS = JSON.parse(JSON.stringify(STEPS_BASE));
-      let currentStepIndex = 0, isAutoConversationRunning=false, isWaitingForUserInput=false;
-      let userData = {};
+  // árboles caerse (subconjunto)
+  function animateTreesFall(duration){
+    const arr = [];
+    for (let i=0;i<treeGroup.children.length;i++){
+      if (Math.random() < 0.22) arr.push(treeGroup.children[i]);
+    }
+    return animateGeneric(duration, (t)=>{
+      const e = Math.pow(t, 0.7);
+      arr.forEach((tr, idx) => {
+        const delay = (idx % 6) * 0.04;
+        let tt = Math.max(0, Math.min(1, (t - delay) / (1 - delay)));
+        tt = Math.pow(tt, 0.9);
+        tr.rotation.x = tr.rotation.x + tt * (Math.PI*0.6) * (Math.random() > 0.5 ? 1 : -1);
+        tr.position.y = -tt * 0.9;
+      });
+    });
+  }
 
-      async function runAutoConversation(){
-        if (isAutoConversationRunning) return;
-        isAutoConversationRunning = true;
-        
-        while (currentStepIndex < STEPS.length){
-          const step = STEPS[currentStepIndex];
-          await new Promise(r => setTimeout(r, step.delay));
-          
-          showTypingIndicator();
-          await new Promise(r => setTimeout(r, 1000));
-          hideTypingIndicator();
+  // función que orquesta la secuencia completa (async)
+  async function runFinaleSequence(){
+    try {
+      // Preparar objetos: rocket y planet (añadidos a escena)
+      rocket = createRocket();
+      rocket.position.set(0, 1.6, 20);
+      rocket.visible = true;
+      scene.add(rocket);
 
-          if(usingRealtime) {
-            const payload = { text: step.text, lang: 'es', sender: 'agent', createdAt: serverTimestamp() };
-            await safePush(pathChatMessages(selectedChatId), payload);
-          } else {
-             addMessage(step.text, 'agent', null, null, new Date().getTime(), false);
-          }
-          if (step.waitForUser){
-            messageInput.placeholder = step.placeholder || "Escribe un mensaje...";
-            messageInput.disabled = false; sendButton.disabled = false;
-            messageInput.focus();
-            isWaitingForUserInput = true;
-            isAutoConversationRunning = false;
-            return;
-          }
-          currentStepIndex++;
-        }
-        isAutoConversationRunning = false;
-      }
-      
-      async function startRealChatFlow(problemDescription) {
-        if (!selectedChatId) {
-            const newChatId = crypto.randomUUID();
-            selectedChatId = newChatId;
-        }
+      planet = createPlanet(18, 0x222222);
+      planet.position.set(0, 220, -320);
+      scene.add(planet);
 
-        const meta = { isRequest:true, username:userData.username||'anónimo', problem:problemDescription || 'No especificado', lang:selectedLang, createdAt: serverTimestamp() };
-        if (usingRealtime) {
-            const ok = await safeSet(pathChat(selectedChatId), meta);
-            if (!ok) {
-                addSystem("No se pudo crear la solicitud en la red (ver consola).");
-            } else {
-                await safePush(pathChatMessages(selectedChatId), { text:`Un usuario (${userData.username||'anónimo'}) con correo (${userData.email||'no especificado'}) solicita chat. Problema: ${problemDescription}.`, sender:'system', isRequest:true, createdAt: serverTimestamp() });
-                
-                // Start AI timer
-                aiTimer = setTimeout(async () => {
-                  const chatRef = await get(ref(db, pathChat(selectedChatId)));
-                  if (chatRef.exists() && chatRef.val().isRequest) {
-                    isAIActive = true;
-                    // Update Firebase to mark AI as active
-                    await safeUpdate(pathChat(selectedChatId), { isAIActive: true });
-                    // Send an introductory message from the AI
-                    const aiIntro = "Un agente no está disponible. El asistente virtual tomará la conversación.";
-                    await safePush(pathChatMessages(selectedChatId), { text: aiIntro, lang: 'es', sender: 'system', isAI: true, createdAt: serverTimestamp() });
-                    const translatedAiIntro = await translateWithFallback(aiIntro, 'es', selectedLang);
-                    await safePush(pathChatMessages(selectedChatId), { text: translatedAiIntro, lang: selectedLang, sender: 'agent', isAI: true, createdAt: serverTimestamp() });
-                  }
-                }, AI_TIMEOUT_MS);
-            }
-        } else {
-            addSystem("Modo prueba: solicitud simulada (sin conexión real).");
-            isAIActive = true;
-            addSystem("Modo prueba: la IA se ha activado inmediatamente.");
-        }
+      // 1) Drone view (ya se quedó al final del intro). Aseguramos droneCam como activeCamera por seguridad
+      activeCamera = droneCam;
+      // Hacemos un pequeño pause visual
+      await sleep(220);
 
-        messageInput.disabled = false;
-        sendButton.disabled = false;
-        
-        if (usingRealtime && selectedChatId){
-          attachMessagesListener(selectedChatId, async (m) => {
-            if (!m) return;
-            const isOwnMessage = m.sender === 'user';
-            
-            if (m.sender === 'user' && userRole === 'user'){
-                addMessage(m.text, 'user', null, m.id, m.createdAt, isOwnMessage);
-            } else if (m.sender === 'agent' && userRole === 'user'){
-              const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
-              addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
-            } else if (m.sender === 'system') {
-                addMessage(m.text, 'system', null, m.id, m.createdAt, false);
-            }
-          });
-        }
-      }
-
-      function setupAgentPanel(){
-        roleSelectionScreen.style.display = 'none';
-        agentLoginScreen.style.display = 'none';
-        chatScreen.style.display = 'flex';
-        messageInput.disabled = false; sendButton.disabled = false;
-        userRole = 'agent';
-
-        if (usingRealtime){
-          attachChatsListener((request) => {
-            selectedChatId = request.chatId;
-            messagesArea.innerHTML = '';
-            addSystem(`Nueva solicitud recibida de ${request.username || 'anónimo'} (problema: ${request.problem || 'No especificado'}). Escribe /accept para atender.`);
-            attachMessagesListener(request.chatId, async (m) => {
-              if (!m) return;
-              const isOwnMessage = m.sender === 'agent';
-              if (m.sender === 'user'){
-                const textForAgent = m.text_es || (m.lang ? await translateWithFallback(m.text, m.lang, 'es') : m.text);
-                addMessage(textForAgent, 'user', `<em>(Original: ${m.lang || 'desconocido'})</em>`, m.id, m.createdAt, isOwnMessage);
-              } else if (m.sender === 'agent') {
-                addMessage(m.text, 'agent', null, m.id, m.createdAt, isOwnMessage);
-              } else if (m.sender === 'system') {
-                addMessage(m.text, 'system', null, m.id, m.createdAt, false);
-              }
-            });
-          });
-        } else {
-          addSystem("Modo prueba: sin solicitudes reales (conexión inactiva).");
-        }
-        addSystem("Bienvenido, agente. Canal de soporte no oficial. Esperando solicitudes...");
-      }
-
-      // Event listeners UI
-      userButton.addEventListener('click', async () => {
-        try {
-          roleSelectionScreen.style.display = 'none';
-          chatScreen.style.display = 'flex';
-          userRole = 'user';
-          selectedLang = langSelect.value || 'es';
-          refreshUserLangDisplay();
-          currentStepIndex = 0; userData = {};
-          messagesArea.innerHTML = '';
-          messageInput.disabled = true; sendButton.disabled = true;
-
-          // NEW LOGIC: Attach listener before sending first message
-          if (usingRealtime) {
-            const newChatId = crypto.randomUUID();
-            selectedChatId = newChatId;
-            attachMessagesListener(selectedChatId, async (m) => {
-                if (!m) return;
-                const isOwnMessage = m.sender === 'user';
-                
-                if (m.sender === 'user' && userRole === 'user'){
-                    addMessage(m.text, 'user', null, m.id, m.createdAt, isOwnMessage);
-                } else if (m.sender === 'agent' && userRole === 'user'){
-                  const translated = await translateWithFallback(m.text, 'es', selectedLang).catch(()=>m.text);
-                  addMessage(translated, 'agent', `<em>(en ${selectedLang})</em>`, m.id, m.createdAt, isOwnMessage);
-                } else if (m.sender === 'system') {
-                    addMessage(m.text, 'system', null, m.id, m.createdAt, false);
-                }
-            });
-          }
-
-          await runAutoConversation();
-        } catch(e) {
-          console.error("userButton click error", e);
-          addSystem("Error en interfaz (revisa consola).");
-        }
+      // 2) Transición a planet camera (acercamiento)
+      activeCamera = planetCam;
+      const planetClosePos = planet.position.clone().add(new THREE.Vector3(0, 0, 48));
+      await animateGeneric(1400, (t) => {
+        const e = t*t*(3-2*t);
+        planetCam.position.lerpVectors(droneCam.position, planetClosePos, e);
+        planetCam.lookAt(planet.position);
       });
 
-      agentButton.addEventListener('click', () => {
-        roleSelectionScreen.style.display = 'none';
-        agentLoginScreen.style.display = 'flex';
+      // 3) Volvemos al cohete y lo seguimos: rocketCam
+      activeCamera = rocketCam;
+      rocketCam.position.copy(rocket.position.clone().add(new THREE.Vector3(0, 4, 18)));
+      rocketCam.lookAt(rocket.position);
+      await sleep(180);
+
+      // 4) Lanzamiento del cohete: animar su posición hacia el planeta (2.4s)
+      const rocketStart = rocket.position.clone();
+      const rocketTarget = planet.position.clone();
+      await animateGeneric(2400, (t) => {
+        const e = 1 - Math.pow(1 - t, 3); // ease out
+        const pos = new THREE.Vector3().lerpVectors(rocketStart, rocketTarget, e);
+        pos.y += e * 120 + Math.sin(e * Math.PI * 3) * 6;
+        rocket.position.copy(pos);
+        rocket.rotation.x = -e * 1.1;
+        // rocketCam follows
+        const desired = pos.clone().add(new THREE.Vector3(0, 6, 18).applyQuaternion(new THREE.Quaternion()));
+        rocketCam.position.lerp(desired, 0.18);
+        rocketCam.lookAt(pos);
       });
 
-      agentLoginCancel.addEventListener('click', () => {
-        agentLoginScreen.style.display = 'none';
-        roleSelectionScreen.style.display = 'flex';
+      // 5) Planet impact / explosión
+      await sleep(120);
+      await animateGeneric(600, (t) => {
+        const e = t;
+        planet.scale.setScalar(1 + e * 3.6);
+        planet.material.emissive = new THREE.Color(0xffaaaa).multiplyScalar(e);
+        renderer.setClearColor(new THREE.Color(0x220000).lerp(new THREE.Color(0x000000), 1 - e));
       });
 
-      agentLoginBtn.addEventListener('click', () => {
-        const p = agentPasswordInput.value || '';
-        if (p === AGENT_PASSWORD){
-          passwordError.style.display = 'none';
-          setupAgentPanel();
-        } else {
-          passwordError.style.display = 'block';
-        }
+      // Partículas y fragments
+      spawnExplosionParticles(planet.position.clone(), 140, 0xffbb66, 80);
+      spawnPlanetFragments(planet.position.clone(), 36);
+
+      // flash
+      triggerFullScreenFlash(380);
+
+      // 6) Tierra se tiembla, árboles caen y tinte rojo
+      redTint.style.background = 'rgba(120,8,8,0.12)'; redTint.style.opacity = '1';
+      await quakeScene(1400);
+      await animateTreesFall(1000);
+
+      // 7) Meteoritos: switch a groundCam y lanzar varios meteors
+      activeCamera = groundCam;
+      groundCam.position.set(0, 6, 40);
+      groundCam.lookAt(new THREE.Vector3(0,0,0));
+
+      const meteorCount = 24;
+      for (let i=0;i<meteorCount;i++){
+        const angle = (Math.random()-0.5) * Math.PI * 0.9;
+        const dist = 380 + Math.random() * 120;
+        const start = planet.position.clone().add(new THREE.Vector3(Math.sin(angle)*dist, 40 + Math.random()*120, Math.cos(angle)*dist));
+        const targetX = (Math.random()-0.5) * 140;
+        const targetZ = (Math.random()-0.5) * 140;
+        const target = new THREE.Vector3(targetX, 0.5 + Math.random()*3, targetZ);
+        spawnMeteor(start, target, 120 + Math.random()*160, 1.2 + Math.random()*1.8);
+        await sleep(120);
+      }
+
+      // Dejar que algunos meteoros impacten
+      await sleep(3000);
+
+      // Pequeña sacudida final
+      await quakeScene(900);
+
+      // Fade de cinemática
+      await animateGeneric(700, (t) => {
+        const e = 1 - t;
+        redTint.style.opacity = `${e * 0.0}`;
+        renderer.setClearColor(new THREE.Color(0x000000).lerp(new THREE.Color(0x000000), 1 - e));
       });
 
-      sendButton.addEventListener('click', async () => {
-        try {
-          const text = messageInput.value.trim();
-          if (!text) return;
-          messageInput.value = '';
-          messageInput.disabled = true;
-          sendButton.disabled = true;
-          
-          if (userRole === 'user'){
-            if (isWaitingForUserInput){
-              const step = STEPS[currentStepIndex];
-              if (step && step.field) userData[step.field] = text;
-              isWaitingForUserInput = false;
-              currentStepIndex++;
-              if (currentStepIndex < STEPS.length) {
-                runAutoConversation();
-              } else {
-                startRealChatFlow(text);
-              }
-              return;
-            }
+      // Limpieza
+      safeRemove(planet);
+      safeRemove(rocket);
+      planet = null; rocket = null;
+      redTint.style.opacity = '0';
 
-            if (!selectedChatId){
-              addSystem("Aún no se ha creado el chat. Intenta de nuevo en un momento.");
-              sendButton.disabled = false; messageInput.disabled = false; return;
-            }
+      // finalizar y pasar a PLAYING
+      finalizeToPlay();
 
-            if (isAIActive) {
-                const aiResponse = await getAIGeneration(text);
-                if (usingRealtime) {
-                    const translatedText = await translateWithFallback(aiResponse, 'es', selectedLang).catch(()=>aiResponse);
-                    const payload = { text: translatedText, lang: selectedLang, text_es: aiResponse, sender: 'agent', isAI: true, createdAt: serverTimestamp() };
-                    await safePush(pathChatMessages(selectedChatId), payload);
-                } else {
-                  addMessage(aiResponse, 'agent', null, null, new Date().getTime(), false);
-                }
-            } else {
-                // Mensaje a agente humano
-                if (usingRealtime){
-                  const text_es = await translateWithFallback(text, selectedLang, 'es').catch(()=>text);
-                  const payload = { text, lang: selectedLang, text_es, sender:'user', createdAt: serverTimestamp() };
-                  await safePush(pathChatMessages(selectedChatId), payload);
-                }
-            }
-          } else if (userRole === 'agent'){
-            if (!selectedChatId){
-              addSystem("No hay chat seleccionado.");
-              sendButton.disabled = false; messageInput.disabled = false; return;
-            }
-            if (text.toLowerCase() === '/accept'){
-              if (usingRealtime){
-                clearTimeout(aiTimer);
-                await safeUpdate(pathChat(selectedChatId), { isRequest:false, isAIActive: false, agentId:userId, acceptedAt: serverTimestamp() });
-                await safePush(pathChatMessages(selectedChatId), { text: "El agente se ha unido a la conversación.", sender:'system', createdAt: serverTimestamp() });
-              } else addSystem("(prueba) chat aceptado");
-              messageInput.placeholder = "Escribe tu respuesta...";
-              messageInput.value = '';
-              sendButton.disabled = false; messageInput.disabled = false;
-              return;
-            }
+    } catch (err) {
+      console.error('Error en runFinaleSequence:', err);
+      finalizeToPlay();
+    }
+  }
 
-            if (usingRealtime){
-              const payload = { text, lang:'es', sender:'agent', createdAt: serverTimestamp() };
-              await safePush(pathChatMessages(selectedChatId), payload);
-            }
-          } else {
-            addSystem("Selecciona un rol antes de enviar.");
-          }
-        } catch(e){
-          console.error("send handler error", e);
-          addSystem("Error enviando mensaje (ver consola).");
-        } finally {
-          sendButton.disabled = false; messageInput.disabled = false;
-        }
-      });
+  // flash full-screen helper
+  function triggerFullScreenFlash(duration=220){
+    const f = document.createElement('div');
+    Object.assign(f.style, { position:'absolute', inset:'0', background:'white', opacity: '0.0', zIndex:9999, pointerEvents:'none' });
+    document.body.appendChild(f);
+    f.style.transition = `opacity ${duration/2}ms ease-out`;
+    requestAnimationFrame(()=> f.style.opacity = '0.92');
+    setTimeout(()=> { f.style.opacity = '0'; setTimeout(()=>document.body.removeChild(f), 260); }, duration);
+  }
 
-      // Enter key shortcut
-      messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendButton.click(); });
+  // cuando la cinemática acaba pasamos a PLAYING mostrando UI y reseteando la cámara del jugador
+  function finalizeToPlay(){
+    gameState = 'PLAYING';
+    gameUiElements.forEach(el => el.style.display = 'flex');
+    document.querySelector('.look-note').style.display = 'block';
+    camera.position.set(0, playerHeight, 0);
+    activeCamera = camera;
+    yaw = 0; pitch = 0;
+    clock.start();
+    shockInterval = setInterval(startShock, shockIntervalMs);
+  }
 
-      // language selector change: update selectedLang and visible label immediately
-      langSelect.addEventListener('change', () => {
-        selectedLang = langSelect.value;
-        refreshUserLangDisplay();
-      });
+  // --- Bucle principal de animación (adaptado para múltiples cámaras) ---
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, clock.getDelta());
+    
+    // mantengo lógica original pero respetando los estados nuevos
+    switch (gameState) {
+      case 'INTRO':
+        updateIntro();
+        break;
+      case 'FINALE':
+        // runFinaleSequence corre asíncrono; aquí solo se renderiza con activeCamera y actualiza flujos
+        break;
+      case 'PLAYING':
+        applyKeyboard();
+        const t = clock.getElapsedTime();
+        if (window._rivers) for (const r of window._rivers){ if (r.material?.uniforms?.time) r.material.uniforms.time.value = t; }
 
-      // initial UI ready
-      connectionStatus.innerText = "Sistema listo";
-      addSystem("Sistema listo. Modo: " + (usingRealtime ? "Conexión en tiempo real" : "Modo prueba (sin conexión)"));
+        // battery original
+        if (flashlightOn && currentBattery > 0) { currentBattery = Math.max(0, currentBattery - dt); if (currentBattery <= 0) { flashlight.visible = false; flashlightOn = false; } updateUI(); }
 
-      // cleanup listeners on unload
-      window.addEventListener('beforeunload', () => {
-        try { detachChatsListener(); detachMessagesListener(); } catch(e){ /* noop */ }
-      });
+        // movimiento original
+        const spd = (moveState.running ? runSpeed : moveSpeed);
+        const dir = new THREE.Vector3();
+        dir.x = Math.sin(yaw) * moveState.forward + Math.cos(yaw) * moveState.right;
+        dir.z = -Math.cos(yaw) * moveState.forward + Math.sin(yaw) * moveState.right;
+        if (dir.lengthSq() > 1) dir.normalize();
+        const newPos = camera.position.clone();
+        newPos.x += dir.x * spd * dt; newPos.z += dir.z * spd * dt;
+        if (!collide(newPos)) camera.position.copy(newPos);
+        camera.position.y = playerHeight;
+        camera.rotation.order = "YXZ"; camera.rotation.y = yaw; camera.rotation.x = pitch;
+        flashlight.position.copy(camera.position);
+        const aim = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+        flashlight.target.position.copy(aim);
+        const pct = Math.max(0, Math.min(1, currentBattery / batteryLife));
+        scene.fog.density = 0.010 + (1 - pct) * 0.028;
+        break;
+    }
 
-      // detach helpers
-      function detachChatsListener(){ if (usingRealtime && chatsListenerRef) try{ off(chatsListenerRef); } catch(e){} chatsListenerRef=null; }
-      function detachMessagesListener(){ if (usingRealtime && messagesListenerRef) try{ off(messagesListenerRef); } catch(e){} messagesListenerRef=null; }
+    // actualizar meteoros si hay
+    const nowMs = performance.now();
+    // calculamos dtMs como pequeño delta
+    const dtMs = 16; // aproximado; no crítico para la demo
+    if (activeMeteors.length > 0) updateMeteors(dtMs);
 
-      // Final log
-      logInfo("Interfaz inicializada, listo para interacción.");
-    }); // DOMContentLoaded end
+    renderer.render(scene, activeCamera);
+  }
+
+  // --- Shock (preservado) ---
+  const shockOverlay = document.getElementById('shockOverlay'); const skullEl = document.getElementById('skull'); let shockActive = false;
+  function startShock() { if (shockActive) return; shockActive = true; document.body.classList.add('shock-active'); shockOverlay.style.opacity = '1'; skullEl.style.transform = 'scale(1.8)'; skullEl.style.opacity = '1'; const originalYaw = yaw, originalPitch = pitch; let shakeElapsed = 0; const shakeDur = 0.9; const shake = (dt) => { if (!shockActive) return; shakeElapsed += dt; const factor = Math.max(0, 1 - (shakeElapsed/shakeDur)); yaw = originalYaw + (Math.random()-0.5) * 0.08 * factor; pitch = originalPitch + (Math.random()-0.5) * 0.04 * factor; if (shakeElapsed < shakeDur) requestAnimationFrame(()=>shake(clock.getDelta())); }; shake(0); setTimeout(endShock, shockDurationMs); }
+  function endShock() { shockActive = false; document.body.classList.remove('shock-active'); skullEl.style.transform = 'scale(0.02)'; skullEl.style.opacity = '0'; shockOverlay.style.opacity = '0'; }
+
+  // --- Simulación de carga e inicio (manteniendo tu flujo) ---
+  function simulateLoading() {
+    const loadingText = document.getElementById('loading-text');
+    const steps = [{ text: "Inicializando motor 3D...", duration: 1000, progress: 25 },{ text: "Generando terreno...", duration: 1200, progress: 55 },{ text: "Creando el bosque...", duration: 1500, progress: 90 },{ text: "Listo para comenzar", duration: 500, progress: 100 }];
+    let totalTime = 0;
+    steps.forEach(step => {
+      setTimeout(() => {
+        loadingText.textContent = step.text;
+        loadingBarFill.style.width = `${step.progress}%`;
+      }, totalTime);
+      totalTime += step.duration;
+    });
+    setTimeout(() => {
+      startButton.style.display = 'block';
+    }, totalTime);
+  }
+  
+  startButton.addEventListener('click', () => {
+    loadingScreen.classList.add('fade-out');
+    setTimeout(() => {
+      loadingScreen.style.display = 'none';
+      // iniciamos la INTRO (drone)
+      gameState = 'INTRO';
+      // ponemos droneCam en la posición inicial del introPath
+      droneCam.position.copy(introPath[0].pos);
+      droneCam.lookAt(introPath[0].lookAt);
+      activeCamera = droneCam;
+      clock.start();
+    }, 500);
+  });
+  
+  window.onload = () => {
+    simulateLoading();
+    animate(); // Inicia render loop
+  };
+  
+  // Utils (preservados)
+  function isMobile(){ return /Mobi|Android/i.test(navigator.userAgent); }
+  window.addEventListener('resize', onWindowResize);
+  function onWindowResize(){ camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); droneCam.aspect = window.innerWidth / window.innerHeight; droneCam.updateProjectionMatrix(); planetCam.aspect = window.innerWidth / window.innerHeight; planetCam.updateProjectionMatrix(); rocketCam.aspect = window.innerWidth / window.innerHeight; rocketCam.updateProjectionMatrix(); groundCam.aspect = window.innerWidth / window.innerHeight; groundCam.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+  if (!isMobile()) { document.getElementById('joystick').style.display = 'none'; document.getElementById('tip').textContent = 'WASD para mover • Click para bloquear mouse • F linterna'; }
+  window.__resetBattery = function(seconds = batteryLife) { currentBattery = seconds; flashlight.visible = flashlightOn && currentBattery>0; updateUI(); };
+  window.__triggerShock = startShock;
+  shockOverlay.style.opacity = '0'; skullEl.style.transform = 'scale(0.02)'; skullEl.style.opacity = '0';
   </script>
 </body>
 </html>
-
